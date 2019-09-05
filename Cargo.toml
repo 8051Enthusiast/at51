@@ -1,8 +1,16 @@
 [package]
 name = "at51"
+description = "Some applications for reverse engineering 8051 firmware"
+readme = "README.md"
 version = "0.1.1"
 authors = ["8051Enthusiast"]
 edition = "2018"
+keywords = ["reverse engineering", "8051"]
+categories = ["command-line-utilities"]
+license = "MIT"
+travis-ci = { repository = "8051Enthusiast/at51", branc = "master" }
+repository = "https://github.com/8051Enthusiast/at51"
+
 
 [dependencies]
 clap = "~2.33.0"
