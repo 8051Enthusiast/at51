@@ -19,13 +19,13 @@ fn main() {
                 .about("Finds the base address of a firmware file")
                 .arg(
                     Arg::with_name("acall")
-                        .help("Use offsets from ajmp/acall (default no)")
+                        .help("Use offsets from ajmp/acall [default: no]")
                         .short("a")
                         .long("acall"),
                 )
                 .arg(
                     Arg::with_name("index-count")
-                        .help("Output n (default: 3) most fitting indexes")
+                        .help("Output the n most fitting indexes")
                         .short("n")
                         .long("index-count")
                         .takes_value(true)
@@ -46,7 +46,7 @@ fn main() {
                 .about("Finds occurences of standard library functions in file")
                 .arg(
                     Arg::with_name("no-check")
-                        .help("Don't check if direct segment references are valid (may lead to more noise")
+                        .help("Don't check if direct segment references are valid (more noise)")
                         .short("n")
                         .long("no-check")
                 )
