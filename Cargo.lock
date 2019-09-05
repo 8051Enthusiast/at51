@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "area8051"
-version = "0.1.0"
+name = "at51"
+version = "0.1.1"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",

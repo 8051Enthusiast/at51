@@ -1,4 +1,4 @@
-# area8051
+# at51
 A bunch of applications for the purpose of reverse engineering 8051 firmware.
 Currently, there are four applications:
 * `stat`, which gives blockwise statistical information about how similar a given file's opcode distribution is to normal 8051 code
@@ -31,7 +31,7 @@ It is recommended to align the file to its load address before using this.
 
 Example (on some random wifi firmware):
 
-With `area8051 libfind some_random_firmware /path/to/lib/C51*.LIB`:
+With `at51 libfind some_random_firmware /path/to/lib/C51*.LIB`:
 ```
 Address | Name                 | Description
 0x4220    ?C?CLDOPTR             char (8-bit) load from general pointer with offset
@@ -63,7 +63,7 @@ The structure is read by the `?C_START` procedure and the location of the struct
 
 Example:
 
-With `area8051 kinit -o offset some_random_firmware`:
+With `at51 kinit -o offset some_random_firmware`:
 ```
 bit 29.6 = 0
 idata[0x5a] = 0x00
@@ -89,7 +89,7 @@ xdata[0x467] = 0x00
 Right now, the only way to install it is to compile it.
 If you have the rust compiler and cargo installed, just do
 ```
-git clone 'https://github.com/8051Enthusiast/area8051.git'
-cargo install --path area8051
+git clone 'https://github.com/8051Enthusiast/at51.git'
+cargo install --path at51
 ```
 

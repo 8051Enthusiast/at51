@@ -1,6 +1,6 @@
 [package]
-name = "area8051"
-version = "0.1.0"
+name = "at51"
+version = "0.1.1"
 authors = ["8051Enthusiast"]
 edition = "2018"
 

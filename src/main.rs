@@ -11,7 +11,7 @@ use std::io::Read;
 use std::process;
 
 fn main() {
-    let cliargs = App::new("area8051")
+    let cliargs = App::new("at51")
         .version("0.1.0")
         .about("Applications for reverse engineering architecture 8051 firmware")
         .subcommand(
