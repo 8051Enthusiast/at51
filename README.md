@@ -84,3 +84,12 @@ idata[0x5c] = 0x00
 xdata[0x403..0x40a] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 xdata[0x467] = 0x00
 ```
+
+## INSTALL
+Right now, the only way to install it is to compile it.
+If you have the rust compiler and cargo installed, just do
+```
+git clone 'https://github.com/8051Enthusiast/area8051.git'
+cargo install --path area8051
+```
+
