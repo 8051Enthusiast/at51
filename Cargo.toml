@@ -1,0 +1,17 @@
+[package]
+name = "area8051"
+version = "0.1.0"
+authors = ["8051Enthusiast"]
+edition = "2018"
+
+[dependencies]
+clap = "~2.33.0"
+rustfft = "~3.0.0"
+nom = "~5.0.0"
+num-traits = "0.2"
+num-derive = "0.2"
+regex = "1"
+lazy_static = "1.4.0"
+
+[dev-dependencies]
+hex = "~0.3.2"
