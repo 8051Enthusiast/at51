@@ -17,30 +17,26 @@ pub fn count_instructions(buf: &[u8], blocksize: usize) -> Vec<[usize; 256]> {
 pub fn square_chi(freq: &[usize], block_n: usize, pop: &[f64]) -> f64 {
     let mut square_x = 0.0f64;
     for (p, q) in freq.iter().zip(pop.iter()) {
-        square_x += (block_n as f64) * ((*p as f64) / (block_n as f64) - q).powi(2) / q;
+        let rel_p = (*p as f64) / (block_n as f64);
+        // I'm not sure if I should ignore the factor at the beginning, it is certainly
+        // more consistent against different blocksizes when leaving it out and we
+        // don't care about statistical significance anyway
+        square_x += /*(block_n as f64) **/ (rel_p - q).powi(2) / q;
     }
     square_x
 }
 
-/// Kullback-Leibler divergence of a block, not used right now.
-pub fn kullback_leibler(freq: &[usize], _block_n: usize, pop: &[f64]) -> f64 {
+/// Kullback-Leibler divergence of a block, ranges from 0 to 1
+pub fn kullback_leibler(freq: &[usize], block_n: usize, pop: &[f64]) -> f64 {
     let mut kld = 0.0f64;
     for (p, q) in freq.iter().zip(pop.iter()) {
         // if freq[i] = 0, we multiply by 0 and the log becomes 0 too (in this case)
         if *p > 0 {
-            kld += (*p as f64) * ((*p as f64) / q).log(256.0);
+            let rel_p = (*p as f64) / (block_n as f64);
+            kld += rel_p * (rel_p / q).log(256.0);
         }
     }
     kld
-}
-
-/// Cross-Entropy of a block, not used right now.
-pub fn cross_entropy(freq: &[usize], _block_n: usize, pop: &[f64]) -> f64 {
-    let mut cross_ent = 0.0f64;
-    for (p, q) in freq.iter().zip(pop.iter()) {
-        cross_ent -= (*p as f64) * q.log(256.0);
-    }
-    cross_ent
 }
 
 /// Runs a statistical goodness-of-fit test blockwise on the opcodes (not operands!).

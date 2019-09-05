@@ -29,7 +29,7 @@ fn main() {
                         .short("n")
                         .long("index-count")
                         .takes_value(true)
-                        .default_value("3")
+                        .default_value("3"),
                 )
                 .arg(
                     Arg::with_name("file")
@@ -48,7 +48,7 @@ fn main() {
                     Arg::with_name("no-check")
                         .help("Don't check if direct segment references are valid (more noise)")
                         .short("n")
-                        .long("no-check")
+                        .long("no-check"),
                 )
                 .arg(
                     Arg::with_name("file")
@@ -74,14 +74,20 @@ fn main() {
                         .short("b")
                         .long("blocksize")
                         .takes_value(true)
-                        .default_value("512")
+                        .default_value("512"),
+                )
+                .arg(
+                    Arg::with_name("kullback-leibler")
+                        .help("Use Kullback-Leibler divergence instead of square-chi")
+                        .short("k")
+                        .long("kullback-leibler"),
                 )
                 .arg(
                     Arg::with_name("corpus")
                         .help("Use a file to derive the frequencies")
                         .short("c")
                         .long("corpus")
-                        .takes_value(true)
+                        .takes_value(true),
                 )
                 .arg(
                     Arg::with_name("file")
@@ -144,7 +150,7 @@ fn main() {
                 if nfiles > 1 {
                     let (best_index, best_value) = base::maxidx(&match_array, 1)[0];
                     println!(
-                        "Best index of '{}': 0x{:04x} with {}",
+                        "Best index of '{}': {:#04x} with {}",
                         name, best_index, best_value
                     );
                 }
@@ -155,7 +161,7 @@ fn main() {
                 .collect();
             println!("Index by likeliness:");
             for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
-                println!("\t{}: 0x{:04x} with {}", i + 1, index, value);
+                println!("\t{}: {:#04x} with {}", i + 1, index, value);
             }
         }
         ("libfind", Some(find_arg)) => {
@@ -202,9 +208,14 @@ fn main() {
                     process::exit(2);
                 })
             });
-            let x = stat::stat_blocks(&contents, blocksize, stat::square_chi, corpus.as_ref());
-            for i in x {
-                println!("{}", i);
+            let statfunction = if stat_arg.is_present("kullback-leibler") {
+                stat::kullback_leibler
+            } else {
+                stat::square_chi
+            };
+            let blocks = stat::stat_blocks(&contents, blocksize, statfunction, corpus.as_ref());
+            for (i, x) in blocks.iter().enumerate() {
+                println!("{:#04x}: {}", i * blocksize, x);
             }
         }
         ("kinit", Some(kinit_arg)) => {
