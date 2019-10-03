@@ -12,7 +12,7 @@ use std::process;
 
 fn main() {
     let cliargs = App::new("at51")
-        .version("0.1.1")
+        .version("0.2.0")
         .about("Applications for reverse engineering architecture 8051 firmware")
         .subcommand(
             SubCommand::with_name("base")
