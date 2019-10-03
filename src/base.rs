@@ -95,14 +95,14 @@ pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
 pub fn maxidx(arr: &[f64], num: usize) -> Vec<(usize, f64)> {
     let mut maxidx = vec![(0, std::f64::NEG_INFINITY); num + 1];
     for candidate in arr.iter().enumerate().map(|(a, b)| (a, *b)) {
-        if maxidx.len() >= num + 1 {
+        if maxidx.len() > num {
             maxidx[num] = candidate;
         } else {
             maxidx.push(candidate);
         }
         maxidx.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Less));
     }
-    if maxidx.len() >= num + 1 {
+    if maxidx.len() > num {
         maxidx.pop();
     }
     maxidx

@@ -178,10 +178,11 @@ fn main() {
                     eprintln!("Could not parse file '{}'", libname);
                     continue;
                 }
-                let modseg: libfind::SegmentCollection = parsed.unwrap().try_into().unwrap_or_else(|err| {
-                    eprintln!("Invalid file content of '{}': {}", libname, err);
-                    process::exit(2);
-                });
+                let modseg: libfind::SegmentCollection =
+                    parsed.unwrap().try_into().unwrap_or_else(|err| {
+                        eprintln!("Invalid file content of '{}': {}", libname, err);
+                        process::exit(2);
+                    });
                 modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
             }
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);

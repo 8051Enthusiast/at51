@@ -531,10 +531,16 @@ fn content_mask_fixup_helper(
                 ));
             }
             Some(RefTyp::Inblock) => {
-                fixups.push(super::Fixup::addr11(segment_start.wrapping_add(fix.refloc), new_reftyp));
+                fixups.push(super::Fixup::addr11(
+                    segment_start.wrapping_add(fix.refloc),
+                    new_reftyp,
+                ));
             }
             Some(RefTyp::Word) => {
-                fixups.push(super::Fixup::addr16(segment_start.wrapping_add(fix.refloc), new_reftyp));
+                fixups.push(super::Fixup::addr16(
+                    segment_start.wrapping_add(fix.refloc),
+                    new_reftyp,
+                ));
             }
             Some(_) => (),
             _ => return Err("Error: unknown reference type!"),

@@ -136,19 +136,18 @@ pub fn print_segrefs(segrefs: &[Segref]) {
     }
 }
 
-#[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub enum SymGoodness {
-    RefOnly = 0,        // symbol is only a reference made by another segment
-    SymWithoutRef = 1,  // symbol content is found in bytes, but references don't check out
-    GoodSym = 2,        // symbol content appears in bytes and references also
+    RefOnly = 0,       // symbol is only a reference made by another segment
+    SymWithoutRef = 1, // symbol content is found in bytes, but references don't check out
+    GoodSym = 2,       // symbol content appears in bytes and references also
 }
-
 
 /// Merges two lists and gives a boolean value for each if the item is only present in the second list.
 fn unify_refs<'a>(
     cslist: &'a mut [Vec<Pubsymref>],
     rslist: &'a mut [Vec<String>],
-    index: usize
+    index: usize,
 ) -> Vec<(&'a str, SymGoodness)> {
     let mut symarray: Vec<(&str, SymGoodness)> = Vec::new();
     // sort both lists so we can simple merge them from left to right
@@ -167,7 +166,7 @@ fn unify_refs<'a>(
     let mut aidx = 0;
     let mut bidx = 0;
     // if both indexes are at the end of their lists, we are finished
-    while aidx < a.len() || bidx < b.len(){
+    while aidx < a.len() || bidx < b.len() {
         // add an item from `a` if there are still items left
         // if there are no items in b left, we don't have to compare them,
         // otherwise we compare them so that we don't just add all items from
@@ -176,20 +175,18 @@ fn unify_refs<'a>(
             let mut validrefs = true;
             for (idx, refname) in &a[aidx].refs {
                 if let Some(subarr) = cslist.get(*idx) {
-                    validrefs = validrefs && subarr.iter().find(|x| &x.name == refname).is_some();
+                    validrefs = validrefs && subarr.iter().any(|x| &x.name == refname);
                     if !validrefs {
                         break;
                     }
-                }
-                else {
+                } else {
                     validrefs = false;
                     break;
                 }
             }
             if validrefs {
                 symarray.push((&a[aidx].name, SymGoodness::GoodSym));
-            }
-            else {
+            } else {
                 symarray.push((&a[aidx].name, SymGoodness::SymWithoutRef));
             }
             aidx += 1;
@@ -198,22 +195,25 @@ fn unify_refs<'a>(
         else if bidx < b.len() && (aidx >= a.len() || a[aidx].name >= b[bidx]) {
             symarray.push((&b[bidx], SymGoodness::RefOnly));
             bidx += 1;
-        }
-        else {
+        } else {
             panic!("Internal Error, this should not happen");
         };
     }
     // only use symbols with maximum goodness
-    let maxel = symarray.iter().map(|(_,x)| x).max().unwrap_or(&SymGoodness::RefOnly).clone();
+    let maxel = symarray
+        .iter()
+        .map(|(_, x)| x)
+        .max()
+        .unwrap_or(&SymGoodness::RefOnly)
+        .clone();
     let mut retarray = Vec::new();
-    for (name, good) in symarray.into_iter().filter(|(_,x)| x == &maxel) {
-        if retarray.last().map(|(s,_)| s) != Some(&name) {
-            retarray.push((name,good));
+    for (name, good) in symarray.into_iter().filter(|(_, x)| x == &maxel) {
+        if retarray.last().map(|(s, _)| s) != Some(&name) {
+            retarray.push((name, good));
         }
-    };
+    }
     retarray
 }
-
 
 /// A collection of segments in general form.
 pub struct SegmentCollection {
@@ -234,7 +234,7 @@ impl SegmentCollection {
     /// 0x10000
     /// * `checkref`: whether to check if local direct segment refernces are checked for validity
     /// (reduces noise)
-    pub fn find_segments<'a>(
+    pub fn find_segments(
         self,
         buf: &[u8],
         cslist: &mut [Vec<Pubsymref>],
@@ -261,7 +261,7 @@ impl SegmentCollection {
         for (segindex, x) in seglist.iter().enumerate() {
             for segpos in x {
                 let mut invalid = false;
-                let mut refvec: Vec<(usize,String)> = Vec::new();
+                let mut refvec: Vec<(usize, String)> = Vec::new();
                 for fix in &self.segments[segindex].fixup {
                     invalid |= !match (&fix.code_ref.reftype, fix.find_target(buf, *segpos)) {
                         // for direct references, check if the other segment exists
@@ -295,7 +295,7 @@ impl SegmentCollection {
                             // are already more than enough
                             cslist[segpos + offset].push(Pubsymref {
                                 name: sym.clone(),
-                                refs: refvec.clone()
+                                refs: refvec.clone(),
                             });
                         }
                     }
@@ -441,7 +441,10 @@ impl Fixup {
             refloc,
             size: 2,
             addr_fun: Box::new(|bytes, pos| {
-                ((pos.wrapping_add(2)) & 0xf800 | ((bytes[0] as usize) << 8) & 7 | bytes[1] as usize) & 0xffff
+                ((pos.wrapping_add(2)) & 0xf800
+                    | ((bytes[0] as usize) << 8) & 7
+                    | bytes[1] as usize)
+                    & 0xffff
             }),
             code_ref,
         }
@@ -450,7 +453,9 @@ impl Fixup {
         Fixup {
             refloc,
             size: 1,
-            addr_fun: Box::new(|bytes, pos| (pos.wrapping_add(1).wrapping_add((bytes[0]) as i8 as usize))),
+            addr_fun: Box::new(|bytes, pos| {
+                (pos.wrapping_add(1).wrapping_add((bytes[0]) as i8 as usize))
+            }),
             code_ref,
         }
     }
@@ -462,7 +467,10 @@ impl Fixup {
             return None;
         }
         // invoke the address finding function with the relevant bytes at the location of it
-        Some((self.addr_fun)(&buf[actual_position..], actual_position).wrapping_sub(self.code_ref.offset))
+        Some(
+            (self.addr_fun)(&buf[actual_position..], actual_position)
+                .wrapping_sub(self.code_ref.offset),
+        )
     }
 }
 
@@ -499,8 +507,15 @@ mod tests {
     #[test]
     fn unify_refs_1() {
         assert_eq!(
-            unify_refs(&mut vec![][..], &mut vec![vec![String::from("a"), String::from("b")]][..], 0),
-            vec![(&"a"[..], SymGoodness::RefOnly), (&"b"[..], SymGoodness::RefOnly)]
+            unify_refs(
+                &mut vec![][..],
+                &mut vec![vec![String::from("a"), String::from("b")]][..],
+                0
+            ),
+            vec![
+                (&"a"[..], SymGoodness::RefOnly),
+                (&"b"[..], SymGoodness::RefOnly)
+            ]
         );
     }
     #[test]
@@ -544,12 +559,14 @@ mod tests {
                         refs: vec![(0, String::from("ab"))]
                     }
                 ]][..],
-                &mut vec![vec![String::from("ba"), String::from("c"), String::from("ab")]][..],
+                &mut vec![vec![
+                    String::from("ba"),
+                    String::from("c"),
+                    String::from("ab")
+                ]][..],
                 0
             ),
-            vec![
-                (&"ab"[..], SymGoodness::GoodSym),
-            ]
+            vec![(&"ab"[..], SymGoodness::GoodSym),]
         );
     }
     #[test]
