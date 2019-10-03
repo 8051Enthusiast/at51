@@ -8,7 +8,7 @@ use regex::Regex;
 pub struct Segref {
     location: usize,
     name: String,
-    is_ref_only: bool,
+    goodness: SymGoodness,
     description: Option<String>,
 }
 
@@ -16,16 +16,18 @@ pub struct Segref {
 /// arithmetic routines.
 ///
 /// # Arguments
-/// * `cslist`: List of public symbols of segments found in the file at each address
+/// * `cslist`: List of public symbols of segments found in the file at each address and the
+/// symbols it references
 /// * `rslits`: List of public symbols referenced by segments by address
-pub fn process_segrefs(cslist: &mut [Vec<String>], rslist: &mut [Vec<String>]) -> Vec<Segref> {
+pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut [Vec<String>]) -> Vec<Segref> {
     let mut segrefs: Vec<Segref> = Vec::new();
     for i in 0..cslist.len().max(rslist.len()) {
-        for (s, r) in match_arrays(cslist.get_mut(i), rslist.get_mut(i)) {
+        let matches = unify_refs(cslist, rslist, i);
+        for (s, r) in matches {
             segrefs.push(Segref {
                 location: i,
                 name: String::from(s),
-                is_ref_only: r,
+                goodness: r,
                 description: None,
             });
         }
@@ -36,7 +38,7 @@ pub fn process_segrefs(cslist: &mut [Vec<String>], rslist: &mut [Vec<String>]) -
         // found in the Keil libraries. A description is generated for these.
         // More info at http://www.keil.com/support/docs/1964.htm and http://www.keil.com/support/docs/1965.htm
         static ref DESC_RE: Regex =
-            Regex::new(r"^\?C\?(?P<s>[SU])?(?P<t>(C|I|P|L|L0|FP))(((?P<f>(LD|ILD|LDI|ST|STK))(?P<m>((X|P|I)?DATA|CODE|O?PTR))(?P<n>0)?)|(?P<o>(ADD|SUB|MUL|DIV|CMP|AND|OR|XOR|NEG)))$").unwrap();
+            Regex::new(r"^\?C\?(?P<s>[SU])?(?P<t>(C|I|P|L|L0|FP))(((?P<f>(LD|ILD|LDI|ST|STK))(?P<m>((X|P|I)?DATA|CODE|O?PTR))(?P<n>0)?)|(?P<o>(ADD|SUB|MUL|DIV|CMP|AND|OR|XOR|NEG|NOT|SHL|SHR)))$").unwrap();
     }
     for segref in &mut segrefs {
         // add description if regex matches
@@ -92,6 +94,9 @@ pub fn process_segrefs(cslist: &mut [Vec<String>], rslist: &mut [Vec<String>]) -
                         "OR" => "bitwise or",
                         "XOR" => "bitwise xor",
                         "NEG" => "negation",
+                        "NOT" => "logical not",
+                        "SHL" => "shift left",
+                        "SHR" => "shift right",
                         _ => "<unknown operation>",
                     });
                 }
@@ -102,6 +107,12 @@ pub fn process_segrefs(cslist: &mut [Vec<String>], rslist: &mut [Vec<String>]) -
     segrefs
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+pub struct Pubsymref {
+    pub name: String,
+    refs: Vec<(usize, String)>,
+}
+
 /// Prints all public symbols found in a table.
 /// Symbols which are only found through references (such as main most of the time)
 /// are put into parantheses.
@@ -110,8 +121,10 @@ pub fn print_segrefs(segrefs: &[Segref]) {
     for segref in segrefs {
         print!("{:<8} ", format!("0x{:04x}", segref.location));
         // indirect references are inside parens
-        if segref.is_ref_only {
+        if segref.goodness == SymGoodness::RefOnly {
             print!(" {:<21} ", format!("({})", segref.name));
+        } else if segref.goodness == SymGoodness::SymWithoutRef {
+            print!(" {:<21} ", format!("[{}]", segref.name));
         } else {
             print!(" {:<21} ", segref.name);
         }
@@ -123,64 +136,84 @@ pub fn print_segrefs(segrefs: &[Segref]) {
     }
 }
 
+#[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Debug)]
+pub enum SymGoodness {
+    RefOnly = 0,        // symbol is only a reference made by another segment
+    SymWithoutRef = 1,  // symbol content is found in bytes, but references don't check out
+    GoodSym = 2,        // symbol content appears in bytes and references also
+}
+
+
 /// Merges two lists and gives a boolean value for each if the item is only present in the second list.
-fn match_arrays<'a>(
-    array_a: Option<&'a mut Vec<String>>,
-    array_b: Option<&'a mut Vec<String>>,
-) -> Vec<(&'a str, bool)> {
-    let mut retarray: Vec<(&str, bool)> = Vec::new();
-    match (array_a, array_b) {
-        (Some(a), Some(b)) => {
-            // sort both lists so we can simple merge them from left to right
-            a.sort();
-            b.sort();
-            let mut aidx = 0;
-            let mut bidx = 0;
-            // if both indexes are at the end of their lists, we are finished
-            while aidx < a.len() || bidx < b.len() {
-                // add an item from `a` if there are still items left
-                // if there are no items in b left, we don't have to compare them,
-                // otherwise we compare them so that we don't just add all items from
-                // a first
-                if aidx < a.len() && (bidx >= b.len() || a[aidx] <= b[bidx]) {
-                    retarray.push((&a[aidx], false));
-                    // if they are the same, we effectively add both items
-                    if bidx < b.len() && a[aidx] == b[bidx] {
-                        bidx += 1;
-                    }
-                    aidx += 1;
-                }
-                // the same case, but for b
-                else if bidx < b.len() && (aidx >= a.len() || a[aidx] > b[bidx]) {
-                    retarray.push((&b[bidx], true));
-                    // we don't have to check for equality this time, since it would have
-                    // been handled in the first branch
-                    bidx += 1;
-                }
-                // the laws of logic forbid this
-                else {
-                    panic!("Internal program error");
-                };
-            }
-        }
-        (Some(a), None) => {
-            // sort for consistency
-            a.sort();
-            for ael in a {
-                retarray.push((ael, false));
-            }
-        }
-        (None, Some(b)) => {
-            b.sort();
-            for bel in b {
-                retarray.push((bel, true));
-            }
-        }
-        // nothing much to do here
-        (None, None) => (),
+fn unify_refs<'a>(
+    cslist: &'a mut [Vec<Pubsymref>],
+    rslist: &'a mut [Vec<String>],
+    index: usize
+) -> Vec<(&'a str, SymGoodness)> {
+    let mut symarray: Vec<(&str, SymGoodness)> = Vec::new();
+    // sort both lists so we can simple merge them from left to right
+    if let Some(arr) = cslist.get_mut(index) {
+        arr.sort();
     }
+    if let Some(arr) = rslist.get_mut(index) {
+        arr.sort();
+    }
+    lazy_static! {
+        static ref EMPTY_A: Vec<Pubsymref> = Vec::new();
+        static ref EMPTY_B: Vec<String> = Vec::new();
+    }
+    let a = cslist.get(index).unwrap_or(&EMPTY_A);
+    let b = rslist.get(index).unwrap_or(&EMPTY_B);
+    let mut aidx = 0;
+    let mut bidx = 0;
+    // if both indexes are at the end of their lists, we are finished
+    while aidx < a.len() || bidx < b.len(){
+        // add an item from `a` if there are still items left
+        // if there are no items in b left, we don't have to compare them,
+        // otherwise we compare them so that we don't just add all items from
+        // a first
+        if aidx < a.len() && (bidx >= b.len() || a[aidx].name <= b[bidx]) {
+            let mut validrefs = true;
+            for (idx, refname) in &a[aidx].refs {
+                if let Some(subarr) = cslist.get(*idx) {
+                    validrefs = validrefs && subarr.iter().find(|x| &x.name == refname).is_some();
+                    if !validrefs {
+                        break;
+                    }
+                }
+                else {
+                    validrefs = false;
+                    break;
+                }
+            }
+            if validrefs {
+                symarray.push((&a[aidx].name, SymGoodness::GoodSym));
+            }
+            else {
+                symarray.push((&a[aidx].name, SymGoodness::SymWithoutRef));
+            }
+            aidx += 1;
+        }
+        // the same case, but for b
+        else if bidx < b.len() && (aidx >= a.len() || a[aidx].name >= b[bidx]) {
+            symarray.push((&b[bidx], SymGoodness::RefOnly));
+            bidx += 1;
+        }
+        else {
+            panic!("Internal Error, this should not happen");
+        };
+    }
+    // only use symbols with maximum goodness
+    let maxel = symarray.iter().map(|(_,x)| x).max().unwrap_or(&SymGoodness::RefOnly).clone();
+    let mut retarray = Vec::new();
+    for (name, good) in symarray.into_iter().filter(|(_,x)| x == &maxel) {
+        if retarray.last().map(|(s,_)| s) != Some(&name) {
+            retarray.push((name,good));
+        }
+    };
     retarray
 }
+
 
 /// A collection of segments in general form.
 pub struct SegmentCollection {
@@ -201,10 +234,10 @@ impl SegmentCollection {
     /// 0x10000
     /// * `checkref`: whether to check if local direct segment refernces are checked for validity
     /// (reduces noise)
-    pub fn find_segments(
+    pub fn find_segments<'a>(
         self,
         buf: &[u8],
-        cslist: &mut [Vec<String>],
+        cslist: &mut [Vec<Pubsymref>],
         rslist: &mut [Vec<String>],
         checkref: bool,
     ) {
@@ -227,11 +260,8 @@ impl SegmentCollection {
         }
         for (segindex, x) in seglist.iter().enumerate() {
             for segpos in x {
-                // I'm too lazy to check for more references than the direct segment references
-                // (and this would probably require keeping every library in memory at once)
-                // it should be enough anyway since we only have 65536 bytes and thus on average
-                // 16 bits should be enough half of the time
                 let mut invalid = false;
+                let mut refvec: Vec<(usize,String)> = Vec::new();
                 for fix in &self.segments[segindex].fixup {
                     invalid |= !match (&fix.code_ref.reftype, fix.find_target(buf, *segpos)) {
                         // for direct references, check if the other segment exists
@@ -241,6 +271,7 @@ impl SegmentCollection {
                             if !rslist[target].contains(name) {
                                 rslist[target].push(name.clone());
                             }
+                            refvec.push((target, name.clone()));
                             true
                         }
                         // if the reference lands outside of the addresses of the buffer,
@@ -254,8 +285,18 @@ impl SegmentCollection {
                 invalid |= self.segments[segindex].content_mask.len() < 3;
                 if !invalid {
                     for (sym, offset) in &self.segments[segindex].pubsyms {
-                        if !cslist[segpos + offset].contains(sym) {
-                            cslist[segpos + offset].push(sym.clone());
+                        if cslist[segpos + offset]
+                            .iter()
+                            .find(|x| &x.name == sym)
+                            .is_none()
+                        {
+                            // I feel bad about copying so much, but I'm lazy and not copying would
+                            // probably require adding another vector somewhere, of which there
+                            // are already more than enough
+                            cslist[segpos + offset].push(Pubsymref {
+                                name: sym.clone(),
+                                refs: refvec.clone()
+                            });
                         }
                     }
                 }
@@ -421,7 +462,7 @@ impl Fixup {
             return None;
         }
         // invoke the address finding function with the relevant bytes at the location of it
-        Some((self.addr_fun)(&buf[actual_position..], actual_position) - self.code_ref.offset)
+        Some((self.addr_fun)(&buf[actual_position..], actual_position).wrapping_sub(self.code_ref.offset))
     }
 }
 
@@ -456,20 +497,59 @@ impl CodeRef {
 mod tests {
     use super::*;
     #[test]
-    fn match_array_1() {
+    fn unify_refs_1() {
         assert_eq!(
-            match_arrays(None, Some(&mut vec![String::from("a"), String::from("b")])),
-            vec![(&"a"[..], true), (&"b"[..], true)]
+            unify_refs(&mut vec![][..], &mut vec![vec![String::from("a"), String::from("b")]][..], 0),
+            vec![(&"a"[..], SymGoodness::RefOnly), (&"b"[..], SymGoodness::RefOnly)]
         );
     }
     #[test]
-    fn match_array_2() {
+    fn unify_refs_2() {
         assert_eq!(
-            match_arrays(
-                Some(&mut vec![String::from("c"), String::from("ab")]),
-                Some(&mut vec![String::from("ba"), String::from("c")])
+            unify_refs(
+                &mut vec![vec![
+                    Pubsymref {
+                        name: String::from("c"),
+                        refs: vec![(4, String::from("k"))]
+                    },
+                    Pubsymref {
+                        name: String::from("ab"),
+                        refs: vec![(7, String::from("l"))]
+                    }
+                ]][..],
+                &mut vec![vec![String::from("ba"), String::from("c")]][..],
+                0
             ),
-            vec![(&"ab"[..], false), (&"ba", true), (&"c"[..], false)]
+            vec![
+                (&"ab"[..], SymGoodness::SymWithoutRef),
+                (&"c"[..], SymGoodness::SymWithoutRef)
+            ]
+        );
+    }
+    #[test]
+    fn unify_refs_3() {
+        assert_eq!(
+            unify_refs(
+                &mut vec![vec![
+                    Pubsymref {
+                        name: String::from("c"),
+                        refs: vec![(4, String::from("k"))]
+                    },
+                    Pubsymref {
+                        name: String::from("ab"),
+                        refs: vec![(3, String::from("k")), (7, String::from("l"))]
+                    },
+                    Pubsymref {
+                        name: String::from("ab"),
+                        refs: vec![(0, String::from("ab"))]
+                    }
+                ]][..],
+                &mut vec![vec![String::from("ba"), String::from("c"), String::from("ab")]][..],
+                0
+            ),
+            vec![
+                (&"ab"[..], SymGoodness::GoodSym),
+            ]
         );
     }
     #[test]

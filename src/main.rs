@@ -167,18 +167,18 @@ fn main() {
         ("libfind", Some(find_arg)) => {
             let filename = find_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
-            let mut pubnames: Vec<Vec<String>> = vec![Vec::new(); contents.len()];
+            let mut pubnames: Vec<Vec<libfind::Pubsymref>> = vec![Vec::new(); contents.len()];
             let mut refnames: Vec<Vec<String>> = vec![Vec::new(); 0x10000];
             let check = !find_arg.is_present("no-check");
             let libnames = find_arg.values_of("libraries").unwrap();
             for libname in libnames {
                 let buffer = read_whole_file_by_name(libname);
-                let parsed = libfind::omf51::Omf51Objects::new(&buffer).unwrap_or_else(|err| {
-                    eprintln!("Could not parse file '{}': {:?}", libname, err);
-                    process::exit(2);
-                });
-//                println!("{:#?}", parsed);
-                let modseg: libfind::SegmentCollection = parsed.try_into().unwrap_or_else(|err| {
+                let parsed = libfind::omf51::Omf51Objects::new(&buffer);
+                if parsed.is_err() {
+                    eprintln!("Could not parse file '{}'", libname);
+                    continue;
+                }
+                let modseg: libfind::SegmentCollection = parsed.unwrap().try_into().unwrap_or_else(|err| {
                     eprintln!("Invalid file content of '{}': {}", libname, err);
                     process::exit(2);
                 });
