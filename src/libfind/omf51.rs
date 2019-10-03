@@ -526,15 +526,15 @@ fn content_mask_fixup_helper(
         match &fix.reftyp {
             Some(RefTyp::Relative) => {
                 fixups.push(super::Fixup::relative(
-                    segment_start + fix.refloc,
+                    segment_start.wrapping_add(fix.refloc),
                     new_reftyp,
                 ));
             }
             Some(RefTyp::Inblock) => {
-                fixups.push(super::Fixup::addr11(segment_start + fix.refloc, new_reftyp));
+                fixups.push(super::Fixup::addr11(segment_start.wrapping_add(fix.refloc), new_reftyp));
             }
             Some(RefTyp::Word) => {
-                fixups.push(super::Fixup::addr16(segment_start + fix.refloc, new_reftyp));
+                fixups.push(super::Fixup::addr16(segment_start.wrapping_add(fix.refloc), new_reftyp));
             }
             Some(_) => (),
             _ => return Err("Error: unknown reference type!"),

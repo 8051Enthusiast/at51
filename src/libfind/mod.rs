@@ -441,7 +441,7 @@ impl Fixup {
             refloc,
             size: 2,
             addr_fun: Box::new(|bytes, pos| {
-                ((pos + 2) & 0xf800 | ((bytes[0] as usize) << 8) & 7 | bytes[1] as usize) & 0xffff
+                ((pos.wrapping_add(2)) & 0xf800 | ((bytes[0] as usize) << 8) & 7 | bytes[1] as usize) & 0xffff
             }),
             code_ref,
         }
@@ -450,7 +450,7 @@ impl Fixup {
         Fixup {
             refloc,
             size: 1,
-            addr_fun: Box::new(|bytes, pos| ((pos + 1) + ((bytes[0]) as i8 as usize))),
+            addr_fun: Box::new(|bytes, pos| (pos.wrapping_add(1).wrapping_add((bytes[0]) as i8 as usize))),
             code_ref,
         }
     }
