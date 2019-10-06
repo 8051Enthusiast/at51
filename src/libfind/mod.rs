@@ -1,6 +1,7 @@
 //! Module for searching for library segments in a firmware image and outputting the positions of
 //! the public symbols in that file.
 pub mod omf51;
+pub mod aslink3;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -399,7 +400,7 @@ impl Segment {
 pub struct Fixup {
     refloc: usize,
     size: usize,
-    addr_fun: Box<dyn Fn(&[u8], usize) -> usize + 'static>,
+    addr_fun: Box<dyn Fn(&[u8], usize) -> usize>,
     code_ref: CodeRef,
 }
 
@@ -416,7 +417,7 @@ impl Fixup {
         refloc: usize,
         size: usize,
         // kept general in case of ASLINK implementation
-        addr_fun: Box<impl Fn(&[u8], usize) -> usize + 'static>,
+        addr_fun: Box<dyn Fn(&[u8], usize) -> usize>,
         code_ref: CodeRef,
     ) -> Self {
         Fixup {
