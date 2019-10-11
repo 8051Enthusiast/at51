@@ -8,7 +8,7 @@ edition = "2018"
 keywords = ["reverse-engineering", "8051"]
 categories = ["command-line-utilities"]
 license = "MIT"
-travis-ci = { repository = "8051Enthusiast/at51", branc = "master" }
+travis-ci = { repository = "8051Enthusiast/at51", branch = "master" }
 repository = "https://github.com/8051Enthusiast/at51"
 
 
@@ -18,7 +18,6 @@ rustfft = "~3.0.0"
 nom = "~5.0.0"
 num-traits = "^0.2"
 num-derive = "^0.3"
-regex = "1"
 lazy_static = "1.4.0"
 ar = "^0.8.0"
 bitflags = "^1.2.0"

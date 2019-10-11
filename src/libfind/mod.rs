@@ -3,7 +3,13 @@
 pub mod aslink3;
 pub mod omf51;
 use lazy_static::lazy_static;
-use regex::Regex;
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    combinator::{map, opt},
+    sequence::tuple,
+    IResult,
+};
 
 /// A single instance of a public symbol found in a firmware image at an address
 pub struct Segref {
@@ -11,6 +17,57 @@ pub struct Segref {
     name: String,
     goodness: SymGoodness,
     description: Option<String>,
+}
+
+// make linter happy
+type Operation<'a> = (&'a str, Option<&'a str>, Option<&'a str>);
+
+fn parse_description(i: &str) -> IResult<&str, (&str, Option<&str>, &str, Operation)> {
+    tuple((
+        tag("?C?"),
+        opt(alt((
+            // signed
+            tag("S"),
+            // unsigned
+            tag("U"),
+        ))),
+        alt((tag("C"), tag("I"), tag("P"), tag("L0"), tag("L"), tag("FP"))),
+        alt((
+            map(
+                alt((
+                    tag("ADD"),
+                    tag("SUB"),
+                    tag("MUL"),
+                    tag("DIV"),
+                    tag("CMP"),
+                    tag("AND"),
+                    tag("OR"),
+                    tag("XOR"),
+                    tag("NEG"),
+                    tag("NOT"),
+                    tag("SHL"),
+                    tag("SHR"),
+                )),
+                |x| (x, None, None),
+            ),
+            map(
+                tuple((
+                    alt((tag("LDI"), tag("LD"), tag("ILD"), tag("STK"), tag("ST"))),
+                    alt((
+                        tag("XDATA"),
+                        tag("PDATA"),
+                        tag("IDATA"),
+                        tag("DATA"),
+                        tag("CODE"),
+                        tag("OPTR"),
+                        tag("PTR"),
+                    )),
+                    opt(tag("0")),
+                )),
+                |(a, b, c)| (a, Some(b), c),
+            ),
+        )),
+    ))(i)
 }
 
 /// Combines cslist and rslist into a vector of Segref and adds description for Keil load, store and
@@ -33,25 +90,19 @@ pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut [Vec<String>]
             });
         }
     }
-    lazy_static! {
-        // oh boy
-        // this regex matches systematic symbols that represent load/store/arithmetic routines
-        // found in the Keil libraries. A description is generated for these.
-        // More info at http://www.keil.com/support/docs/1964.htm and http://www.keil.com/support/docs/1965.htm
-        static ref DESC_RE: Regex =
-            Regex::new(r"^\?C\?(?P<s>[SU])?(?P<t>(C|I|P|L|L0|FP))(((?P<f>(LD|ILD|LDI|ST|STK))(?P<m>((X|P|I)?DATA|CODE|O?PTR))(?P<n>0)?)|(?P<o>(ADD|SUB|MUL|DIV|CMP|AND|OR|XOR|NEG|NOT|SHL|SHR)))$").unwrap();
-    }
     for segref in &mut segrefs {
         // add description if regex matches
-        if let Some(cap) = DESC_RE.captures(&segref.name) {
+        if let Ok((_, (_, signed, datatype, (operation, target, addendum)))) =
+            parse_description(&segref.name)
+        {
             let mut desc = String::from("");
-            desc.push_str(match cap.name("s").map(|x| x.as_str()) {
+            desc.push_str(match signed {
                 Some("S") => "signed ",
                 Some("U") => "unsigned ",
                 Some(_) => "<unknown sign> ",
                 None => "",
             });
-            desc.push_str(match cap.name("t").unwrap().as_str() {
+            desc.push_str(match datatype {
                 "C" => "char (8-bit) ",
                 "I" => "int (16-bit) ",
                 "P" => "general pointer ",
@@ -60,47 +111,39 @@ pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut [Vec<String>]
                 "FP" => "float ",
                 _ => "<unknown type> ",
             });
-            match cap.name("f").map(|x| x.as_str()) {
-                Some(s) => {
-                    desc.push_str(match s {
-                        "LD" => "load from ",
-                        "ILD" => "pre-increment load from ",
-                        "LDI" => "post-increment load from ",
-                        "ST" => "store to ",
-                        "STK" => "constant store to ",
-                        _ => "<unknown operation> of ",
-                    });
-                    desc.push_str(match cap.name("m").unwrap().as_str() {
-                        "XDATA" => "xdata",
-                        "PDATA" => "pdata (external ram)",
-                        "IDATA" => "idata (indirect ram access)",
-                        "DATA" => "data (direct ram access)",
-                        "CODE" => "code space",
-                        "OPTR" => "general pointer with offset",
-                        "PTR" => "general pointer",
-                        _ => "<unknown memory>",
-                    });
-                    if cap.name("n").is_some() {
-                        desc.push_str(" into r3-r0");
-                    }
-                }
-                None => {
-                    desc.push_str(match cap.name("o").unwrap().as_str() {
-                        "ADD" => "addition",
-                        "SUB" => "subtraction",
-                        "MUL" => "multiply",
-                        "DIV" => "division",
-                        "CMP" => "compare",
-                        "AND" => "bitwise and",
-                        "OR" => "bitwise or",
-                        "XOR" => "bitwise xor",
-                        "NEG" => "negation",
-                        "NOT" => "logical not",
-                        "SHL" => "shift left",
-                        "SHR" => "shift right",
-                        _ => "<unknown operation>",
-                    });
-                }
+            desc.push_str(match operation {
+                "LD" => "load from ",
+                "ILD" => "pre-increment load from ",
+                "LDI" => "post-increment load from ",
+                "ST" => "store to ",
+                "STK" => "constant store to ",
+                "ADD" => "addition",
+                "SUB" => "subtraction",
+                "MUL" => "multiply",
+                "DIV" => "division",
+                "CMP" => "compare",
+                "AND" => "bitwise and",
+                "OR" => "bitwise or",
+                "XOR" => "bitwise xor",
+                "NEG" => "negation",
+                "NOT" => "logical not",
+                "SHL" => "shift left",
+                "SHR" => "shift right",
+                _ => "<unknown operation>",
+            });
+            desc.push_str(match target {
+                Some("XDATA") => "xdata",
+                Some("PDATA") => "pdata (external ram)",
+                Some("IDATA") => "idata (indirect ram access)",
+                Some("DATA") => "data (direct ram access)",
+                Some("CODE") => "code space",
+                Some("OPTR") => "general pointer with offset",
+                Some("PTR") => "general pointer",
+                None => "",
+                _ => "<unknown memory>",
+            });
+            if addendum.is_some() {
+                desc.push_str(" into r3-r0");
             }
             segref.description = Some(desc);
         }
