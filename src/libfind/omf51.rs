@@ -580,7 +580,7 @@ impl std::convert::TryFrom<Omf51Objects> for super::SegmentCollection {
             // a map that maps the segment id of the module into a per-file unique segment id
             // so that we don't have to keep track of the module, which we don't need
             let mut segid_unique_map = Vec::new();
-            // content & mask for each segment
+            // content & mask & fixup for each segment
             let mut segid_cont_mask = Vec::new();
             for (i, s) in relevant_reloc_code_segs.iter().enumerate() {
                 // sequentially allocate ids so that they correspond to position in module_array

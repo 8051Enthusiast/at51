@@ -173,16 +173,19 @@ fn main() {
             let libnames = find_arg.values_of("libraries").unwrap();
             for libname in libnames {
                 let buffer = read_whole_file_by_name(libname);
-                let parsed = libfind::omf51::Omf51Objects::new(&buffer);
+                let parsed = libfind::omf51::Omf51Objects::new(&buffer)
+                    .map(|x| x.try_into())
+                    .or_else(|_| {
+                        libfind::aslink3::Aslink3Objects::new(&buffer).map(|x| x.try_into())
+                    });
                 if parsed.is_err() {
                     eprintln!("Could not parse file '{}'", libname);
                     continue;
                 }
-                let modseg: libfind::SegmentCollection =
-                    parsed.unwrap().try_into().unwrap_or_else(|err| {
-                        eprintln!("Invalid file content of '{}': {}", libname, err);
-                        process::exit(2);
-                    });
+                let modseg: libfind::SegmentCollection = parsed.unwrap().unwrap_or_else(|err| {
+                    eprintln!("Invalid file content of '{}': {}", libname, err);
+                    process::exit(2);
+                });
                 modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
             }
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);

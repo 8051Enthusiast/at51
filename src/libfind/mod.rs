@@ -1,7 +1,7 @@
 //! Module for searching for library segments in a firmware image and outputting the positions of
 //! the public symbols in that file.
-pub mod omf51;
 pub mod aslink3;
+pub mod omf51;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -283,7 +283,12 @@ impl SegmentCollection {
                 invalid &= !checkref;
                 // short segments can create a lot of noise and we don't really care for them
                 // anyway
-                invalid |= self.segments[segindex].content_mask.len() < 3;
+                let active_bytes: usize = self.segments[segindex]
+                    .content_mask
+                    .iter()
+                    .map(|(_, mask)| usize::from(*mask != 0))
+                    .sum();
+                invalid |= active_bytes < 4;
                 if !invalid {
                     for (sym, offset) in &self.segments[segindex].pubsyms {
                         if cslist[segpos + offset]
@@ -327,7 +332,6 @@ fn find_masked_subvalue(whstart: usize, whole: &[u8], subvalue: &[(u8, u8)]) -> 
 fn check_at_location(whstart: usize, whole: &[u8], subvalue: &[(u8, u8)], start: usize) -> bool {
     // if either side is out of bounds, it is not contained
     if start < whstart || start + subvalue.len() > whstart + whole.len() {
-        println!("{}", start + subvalue.len() >= whstart + whole.len());
         return false;
     }
     for (i, (c, m)) in subvalue.iter().enumerate() {
