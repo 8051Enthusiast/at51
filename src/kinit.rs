@@ -11,6 +11,7 @@ use nom::{
     sequence::{pair, terminated, tuple},
     IResult,
 };
+use serde::Serialize;
 
 #[derive(Debug, PartialEq)]
 enum DataType {
@@ -66,7 +67,7 @@ fn info_header(i: &[u8]) -> IResult<&[u8], InfoHeader> {
     )(i)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 enum InitBlock {
     IDATA((u8, Vec<u8>)),
     XDATA((u16, Vec<u8>)),
@@ -95,7 +96,7 @@ fn init_block(i: &[u8]) -> IResult<&[u8], InitBlock> {
 /// of a 8051 firmware that is compiled with a Keil C51 compiler.
 /// Typically, its address is loaded into dptr right at the beginning
 /// of ?C_START, which we can normally find with the libfind subcommand.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct InitData {
     blocks: Vec<InitBlock>,
 }

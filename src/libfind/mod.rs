@@ -10,8 +10,10 @@ use nom::{
     sequence::tuple,
     IResult,
 };
+use serde::Serialize;
 
 /// A single instance of a public symbol found in a firmware image at an address
+#[derive(Serialize)]
 pub struct Segref {
     location: usize,
     name: String,
@@ -180,7 +182,7 @@ pub fn print_segrefs(segrefs: &[Segref]) {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize)]
 pub enum SymGoodness {
     RefOnly = 0,       // symbol is only a reference made by another segment
     SymWithoutRef = 1, // symbol content is found in bytes, but references don't check out
@@ -619,6 +621,7 @@ mod tests {
     }
     #[test]
     fn find_masked_subvalue_oversize() {
+        let empty: Vec<usize> = vec![];
         assert_eq!(
             find_masked_subvalue(
                 0,
@@ -634,7 +637,7 @@ mod tests {
                     (13, 0xff)
                 ]
             ),
-            vec![]
+            empty
         );
     }
     #[test]

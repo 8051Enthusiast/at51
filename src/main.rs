@@ -24,6 +24,12 @@ fn main() {
                         .long("acall"),
                 )
                 .arg(
+                    Arg::with_name("json")
+                        .help("Output JSON (warning: outputs array of length 65536)")
+                        .short("j")
+                        .long("json"),
+                )
+                .arg(
                     Arg::with_name("index-count")
                         .help("Output the n most fitting indexes")
                         .short("n")
@@ -45,8 +51,14 @@ fn main() {
             SubCommand::with_name("libfind")
                 .about("Finds occurences of standard library functions in file")
                 .arg(
+                    Arg::with_name("json")
+                        .help("Output JSON")
+                        .short("j")
+                        .long("json"),
+                )
+                .arg(
                     Arg::with_name("no-check")
-                        .help("Don't check if direct segment references are valid (more noise)")
+                        .help("Do not check if direct segment references are valid (more noise)")
                         .short("n")
                         .long("no-check"),
                 )
@@ -77,17 +89,23 @@ fn main() {
                         .default_value("512"),
                 )
                 .arg(
-                    Arg::with_name("kullback-leibler")
-                        .help("Use Kullback-Leibler divergence instead of square-chi")
-                        .short("k")
-                        .long("kullback-leibler"),
-                )
-                .arg(
                     Arg::with_name("corpus")
                         .help("Use a file to derive the frequencies")
                         .short("c")
                         .long("corpus")
                         .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("json")
+                        .help("Output JSON")
+                        .short("j")
+                        .long("json"),
+                )
+                .arg(
+                    Arg::with_name("kullback-leibler")
+                        .help("Use Kullback-Leibler divergence instead of square-chi")
+                        .short("k")
+                        .long("kullback-leibler"),
                 )
                 .arg(
                     Arg::with_name("file")
@@ -99,6 +117,12 @@ fn main() {
         .subcommand(
             SubCommand::with_name("kinit")
                 .about("Shows the initialized variables of the Keil init segment")
+                .arg(
+                    Arg::with_name("json")
+                        .help("Output JSON")
+                        .short("j")
+                        .long("json"),
+                )
                 .arg(
                     Arg::with_name("offset")
                         .help("Location of Keil init data structure")
@@ -147,7 +171,7 @@ fn main() {
                     .zip(match_array.iter())
                     .map(|(x, y)| x + y)
                     .collect();
-                if nfiles > 1 {
+                if nfiles > 1 && !base_arg.is_present("json") {
                     let (best_index, best_value) = base::maxidx(&match_array, 1)[0];
                     println!(
                         "Best index of '{}': {:#04x} with {}",
@@ -160,8 +184,16 @@ fn main() {
                 .map(|x| x / base_arg.occurrences_of("file") as f64)
                 .collect();
             println!("Index by likeliness:");
-            for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
-                println!("\t{}: {:#04x} with {}", i + 1, index, value);
+            if base_arg.is_present("json") {
+                let json_str = serde_json::to_string(&mean).unwrap_or_else(|err| {
+                    eprintln!("Could not print json: {}", err);
+                    process::exit(2);
+                });
+                println!("{}", json_str);
+            } else {
+                for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
+                    println!("\t{}: {:#04x} with {}", i + 1, index, value);
+                }
             }
         }
         ("libfind", Some(find_arg)) => {
@@ -189,7 +221,15 @@ fn main() {
                 modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
             }
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
-            libfind::print_segrefs(&segrefs);
+            if find_arg.is_present("json") {
+                let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {
+                    eprintln!("Could not print json: {}", err);
+                    process::exit(2);
+                });
+                println!("{}", json_str);
+            } else {
+                libfind::print_segrefs(&segrefs);
+            }
         }
         ("stat", Some(stat_arg)) => {
             let filename = stat_arg.value_of("file").unwrap();
@@ -218,8 +258,16 @@ fn main() {
                 stat::square_chi
             };
             let blocks = stat::stat_blocks(&contents, blocksize, statfunction, corpus.as_ref());
-            for (i, x) in blocks.iter().enumerate() {
-                println!("{:#04x}: {}", i * blocksize, x);
+            if stat_arg.is_present("json") {
+                let json_str = serde_json::to_string(&blocks).unwrap_or_else(|err| {
+                    eprintln!("Could not print json: {}", err);
+                    process::exit(2);
+                });
+                println!("{}", json_str);
+            } else {
+                for (i, x) in blocks.iter().enumerate() {
+                    println!("{:#04x}: {}", i * blocksize, x);
+                }
             }
         }
         ("kinit", Some(kinit_arg)) => {
@@ -237,7 +285,15 @@ fn main() {
                 eprintln!("Error parsing data structure");
                 process::exit(2);
             });
-            init_data.print();
+            if kinit_arg.is_present("json") {
+                let json_str = serde_json::to_string(&init_data).unwrap_or_else(|err| {
+                    eprintln!("Could not print json: {}", err);
+                    process::exit(2);
+                });
+                println!("{}", json_str);
+            } else {
+                init_data.print();
+            }
         }
         _ => {
             println!("{}", cliargs.usage());

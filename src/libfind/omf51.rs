@@ -58,7 +58,7 @@ impl FromPrimitive for SegTyp {
             2 => Some(SegTyp::Data),
             3 => Some(SegTyp::Idata),
             4 => Some(SegTyp::Bit),
-            _ => None
+            _ => None,
         }
     }
     fn from_u64(n: u64) -> Option<Self> {
@@ -68,7 +68,7 @@ impl FromPrimitive for SegTyp {
             2 => Some(SegTyp::Data),
             3 => Some(SegTyp::Idata),
             4 => Some(SegTyp::Bit),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -92,7 +92,7 @@ impl FromPrimitive for RelTyp {
             3 => Some(RelTyp::Inpage),
             4 => Some(RelTyp::Inblock),
             5 => Some(RelTyp::Page),
-            _ => None
+            _ => None,
         }
     }
     fn from_u64(n: u64) -> Option<Self> {
@@ -103,7 +103,7 @@ impl FromPrimitive for RelTyp {
             3 => Some(RelTyp::Inpage),
             4 => Some(RelTyp::Inblock),
             5 => Some(RelTyp::Page),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -272,7 +272,7 @@ impl FromPrimitive for RefTyp {
             5 => Some(RefTyp::Inblock),
             6 => Some(RefTyp::BitAddr),
             7 => Some(RefTyp::Conv),
-            _ => None
+            _ => None,
         }
     }
     fn from_u64(n: u64) -> Option<Self> {
@@ -285,7 +285,7 @@ impl FromPrimitive for RefTyp {
             5 => Some(RefTyp::Inblock),
             6 => Some(RefTyp::BitAddr),
             7 => Some(RefTyp::Conv),
-            _ => None
+            _ => None,
         }
     }
 }

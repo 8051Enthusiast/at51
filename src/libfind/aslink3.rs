@@ -410,7 +410,7 @@ impl Mode {
     fn get_fixup_function(
         self,
         format_tuple: (Radix, Endian, u8),
-        offset: usize
+        offset: usize,
     ) -> impl Fn(&[u8], usize) -> usize {
         move |bytes, addr| {
             let jump_type = self.get_jump_type();
@@ -452,8 +452,7 @@ impl Mode {
                     JumpType::Other => {
                         if self.contains(Mode::THREE_BYTES) {
                             23
-                        }
-                        else {
+                        } else {
                             15
                         }
                     }
@@ -751,19 +750,21 @@ fn process_relocs(
             continue;
         }
         // apply relocation to content
-        offset_array.push(frag.mode
-            .modify_cmf_to_fixup(&mut full_array[usize::from(frag.offset)..], module.format));
+        offset_array.push(
+            frag.mode
+                .modify_cmf_to_fixup(&mut full_array[usize::from(frag.offset)..], module.format),
+        );
     }
     let (content_mask, fixups) = content_mask_fixup;
     let mut new_content_index = 0;
     let mut cmf_index = rel.content.offset as usize;
     while cmf_index < content_mask.len() && new_content_index < full_array.len() {
         // all relocations that apply to the current offset
-        for (i,frag) in rel
+        for (i, frag) in rel
             .frags
             .iter()
             .enumerate()
-            .filter(|(_,x)| usize::from(x.offset) == new_content_index)
+            .filter(|(_, x)| usize::from(x.offset) == new_content_index)
         {
             // we want to be sure that we have all information, which
             // we don't have when only the lowest of three bytes is written
