@@ -11,6 +11,61 @@ use nom::{
     IResult,
 };
 use serde::Serialize;
+use std::{
+    convert::TryInto,
+    fs,
+    io::Result
+};
+
+/// Reads a list of libraries, parses them and calls the find_segments function on each of them for
+/// the function, returning the cslist and rslist arrays.
+/// For files in the libpath array, all available parsers are tried and if it does not work, the
+/// file is skipped.
+/// For directories in the libpath array, all files in the directory are tried.
+/// # Arguments
+/// * `libpath`: Array of libraray paths
+/// * `contents`: Contents of the file to find segments of
+/// * `check`: Whether to check if local references are valid
+pub fn read_libraries(libpath: &[&str], contents: &[u8], check: bool) -> Result<(Vec<Vec<Pubsymref>>, Vec<Vec<String>>)> {
+    let mut libnames: Vec<std::path::PathBuf> = Vec::new();
+    for path in libpath {
+        let path_meta = std::fs::metadata(path)?;
+        // read files directly
+        if path_meta.is_file() {
+            libnames.push(std::path::PathBuf::from(path));
+        }
+        // for directories, look for each file
+        else if path_meta.is_dir() {
+            let dir = fs::read_dir(path)?;
+            for entry in dir {
+                let real_entry = entry?;
+                if real_entry.file_type()?.is_file() {
+                    libnames.push(real_entry.path())
+                }
+            }
+        }
+    }
+    let mut pubnames: Vec<Vec<Pubsymref>> = vec![Vec::new(); contents.len()];
+    let mut refnames: Vec<Vec<String>> = vec![Vec::new(); 0x10000];
+    for libname in libnames {
+        let buffer = fs::read(libname)?;
+        // try both the omf51 and aslink3 parser
+        let parsed = omf51::Omf51Objects::new(&buffer)
+            .map(|x| x.try_into())
+            .or_else(|_| {
+                aslink3::Aslink3Objects::new(&buffer).map(|x| x.try_into())
+            });
+        // skip files we are not able to parse
+        if parsed.is_err() {
+            continue;
+        }
+        let modseg: SegmentCollection = parsed.unwrap().or_else(|err| {
+            Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+        })?;
+        modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
+    };
+    Ok((pubnames, refnames))
+}
 
 /// A single instance of a public symbol found in a firmware image at an address
 #[derive(Serialize)]
@@ -19,57 +74,6 @@ pub struct Segref {
     name: String,
     goodness: SymGoodness,
     description: Option<String>,
-}
-
-// make linter happy
-type Operation<'a> = (&'a str, Option<&'a str>, Option<&'a str>);
-
-fn parse_description(i: &str) -> IResult<&str, (&str, Option<&str>, &str, Operation)> {
-    tuple((
-        tag("?C?"),
-        opt(alt((
-            // signed
-            tag("S"),
-            // unsigned
-            tag("U"),
-        ))),
-        alt((tag("C"), tag("I"), tag("P"), tag("L0"), tag("L"), tag("FP"))),
-        alt((
-            map(
-                alt((
-                    tag("ADD"),
-                    tag("SUB"),
-                    tag("MUL"),
-                    tag("DIV"),
-                    tag("CMP"),
-                    tag("AND"),
-                    tag("OR"),
-                    tag("XOR"),
-                    tag("NEG"),
-                    tag("NOT"),
-                    tag("SHL"),
-                    tag("SHR"),
-                )),
-                |x| (x, None, None),
-            ),
-            map(
-                tuple((
-                    alt((tag("LDI"), tag("LD"), tag("ILD"), tag("STK"), tag("ST"))),
-                    alt((
-                        tag("XDATA"),
-                        tag("PDATA"),
-                        tag("IDATA"),
-                        tag("DATA"),
-                        tag("CODE"),
-                        tag("OPTR"),
-                        tag("PTR"),
-                    )),
-                    opt(tag("0")),
-                )),
-                |(a, b, c)| (a, Some(b), c),
-            ),
-        )),
-    ))(i)
 }
 
 /// Combines cslist and rslist into a vector of Segref and adds description for Keil load, store and
@@ -151,6 +155,57 @@ pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut [Vec<String>]
         }
     }
     segrefs
+}
+
+// make linter happy
+type Operation<'a> = (&'a str, Option<&'a str>, Option<&'a str>);
+
+fn parse_description(i: &str) -> IResult<&str, (&str, Option<&str>, &str, Operation)> {
+    tuple((
+        tag("?C?"),
+        opt(alt((
+            // signed
+            tag("S"),
+            // unsigned
+            tag("U"),
+        ))),
+        alt((tag("C"), tag("I"), tag("P"), tag("L0"), tag("L"), tag("FP"))),
+        alt((
+            map(
+                alt((
+                    tag("ADD"),
+                    tag("SUB"),
+                    tag("MUL"),
+                    tag("DIV"),
+                    tag("CMP"),
+                    tag("AND"),
+                    tag("OR"),
+                    tag("XOR"),
+                    tag("NEG"),
+                    tag("NOT"),
+                    tag("SHL"),
+                    tag("SHR"),
+                )),
+                |x| (x, None, None),
+            ),
+            map(
+                tuple((
+                    alt((tag("LDI"), tag("LD"), tag("ILD"), tag("STK"), tag("ST"))),
+                    alt((
+                        tag("XDATA"),
+                        tag("PDATA"),
+                        tag("IDATA"),
+                        tag("DATA"),
+                        tag("CODE"),
+                        tag("OPTR"),
+                        tag("PTR"),
+                    )),
+                    opt(tag("0")),
+                )),
+                |(a, b, c)| (a, Some(b), c),
+            ),
+        )),
+    ))(i)
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]

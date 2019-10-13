@@ -5,7 +5,6 @@ pub mod libfind;
 pub mod stat;
 
 use clap::{App, Arg, SubCommand};
-use std::convert::TryInto;
 use std::fs::File;
 use std::io::Read;
 use std::process;
@@ -199,27 +198,14 @@ fn main() {
         ("libfind", Some(find_arg)) => {
             let filename = find_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
-            let mut pubnames: Vec<Vec<libfind::Pubsymref>> = vec![Vec::new(); contents.len()];
-            let mut refnames: Vec<Vec<String>> = vec![Vec::new(); 0x10000];
+//            let mut pubnames: Vec<Vec<libfind::Pubsymref>> = vec![Vec::new(); contents.len()];
+//            let mut refnames: Vec<Vec<String>> = vec![Vec::new(); 0x10000];
             let check = !find_arg.is_present("no-check");
-            let libnames = find_arg.values_of("libraries").unwrap();
-            for libname in libnames {
-                let buffer = read_whole_file_by_name(libname);
-                let parsed = libfind::omf51::Omf51Objects::new(&buffer)
-                    .map(|x| x.try_into())
-                    .or_else(|_| {
-                        libfind::aslink3::Aslink3Objects::new(&buffer).map(|x| x.try_into())
-                    });
-                if parsed.is_err() {
-                    eprintln!("Could not parse file '{}'", libname);
-                    continue;
-                }
-                let modseg: libfind::SegmentCollection = parsed.unwrap().unwrap_or_else(|err| {
-                    eprintln!("Invalid file content of '{}': {}", libname, err);
-                    process::exit(2);
-                });
-                modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
-            }
+            let libnames: Vec<_> = find_arg.values_of("libraries").unwrap().collect();
+            let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check).unwrap_or_else(|err| {
+                eprintln!("Could not process library files: {}", err);
+                process::exit(2);
+            });
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
             if find_arg.is_present("json") {
                 let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {

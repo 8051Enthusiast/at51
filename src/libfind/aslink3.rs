@@ -1,3 +1,10 @@
+//! This module parses aslink3 modules.
+//!
+//! This is used within the libraries used by the sdcc compiler.
+//! It is a 'human readable format' in that it only consists of printable characters,
+//! but it is mostly bytes encoded as numbers and a few strings.
+//! Note that the sdcc library files themselves are ont aslink3 modules but are BSD ar archives
+//! that contain the aslink3 modules.
 use ar::Archive;
 use bitflags::bitflags;
 use nom::{
