@@ -2,7 +2,7 @@
 name = "at51"
 description = "Some applications for reverse engineering 8051 firmware"
 readme = "README.md"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["8051Enthusiast"]
 edition = "2018"
 keywords = ["reverse-engineering", "8051"]
@@ -13,14 +13,13 @@ repository = "https://github.com/8051Enthusiast/at51"
 
 
 [dependencies]
-clap = "~2.33.0"
-rustfft = "~3.0.0"
-nom = "~5.0.0"
-num-traits = "^0.2"
-num-derive = "^0.3"
-lazy_static = "1.4.0"
-ar = "^0.8.0"
-bitflags = "^1.2.0"
+clap = "~2.33.0"	# cl arg parsing
+rustfft = "~3.0.0"	# base address finding
+nom = "~5.0.0"		# parse libraries, init structure
+num-traits = "^0.2"	# omf51 parsing
+lazy_static = "1.4.0"	# for some default values
+ar = "^0.8.0"		# for sdcc library, which is an bsd ar archive
+bitflags = "^1.2.0"	# for sdcc library
 
 [dev-dependencies]
-hex = "~0.4.0"
+hex = "~0.4.0"		# used for omf51 tests

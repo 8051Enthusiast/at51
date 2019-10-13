@@ -10,7 +10,6 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
 };
-use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 static KNOWN_TYPES: [u8; 21] = [
@@ -43,7 +42,7 @@ enum Definition {
 }
 
 // address spaces the segments can reside in
-#[derive(FromPrimitive, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 enum SegTyp {
     Code = 0,
     Xdata = 1,
@@ -51,9 +50,31 @@ enum SegTyp {
     Idata = 3,
     Bit = 4,
 }
+impl FromPrimitive for SegTyp {
+    fn from_i64(n: i64) -> Option<Self> {
+        match n {
+            0 => Some(SegTyp::Code),
+            1 => Some(SegTyp::Xdata),
+            2 => Some(SegTyp::Data),
+            3 => Some(SegTyp::Idata),
+            4 => Some(SegTyp::Bit),
+            _ => None
+        }
+    }
+    fn from_u64(n: u64) -> Option<Self> {
+        match n {
+            0 => Some(SegTyp::Code),
+            1 => Some(SegTyp::Xdata),
+            2 => Some(SegTyp::Data),
+            3 => Some(SegTyp::Idata),
+            4 => Some(SegTyp::Bit),
+            _ => None
+        }
+    }
+}
 
 // type of relocation of segment
-#[derive(FromPrimitive, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 enum RelTyp {
     Abs = 0,
     Unit = 1,
@@ -61,6 +82,30 @@ enum RelTyp {
     Inpage = 3,
     Inblock = 4,
     Page = 5,
+}
+impl FromPrimitive for RelTyp {
+    fn from_i64(n: i64) -> Option<Self> {
+        match n {
+            0 => Some(RelTyp::Abs),
+            1 => Some(RelTyp::Unit),
+            2 => Some(RelTyp::Bitaddressable),
+            3 => Some(RelTyp::Inpage),
+            4 => Some(RelTyp::Inblock),
+            5 => Some(RelTyp::Page),
+            _ => None
+        }
+    }
+    fn from_u64(n: u64) -> Option<Self> {
+        match n {
+            0 => Some(RelTyp::Abs),
+            1 => Some(RelTyp::Unit),
+            2 => Some(RelTyp::Bitaddressable),
+            3 => Some(RelTyp::Inpage),
+            4 => Some(RelTyp::Inblock),
+            5 => Some(RelTyp::Page),
+            _ => None
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -205,7 +250,7 @@ fn content(longm: bool) -> impl Fn(&[u8]) -> IResult<&[u8], Content> {
     }
 }
 
-#[derive(FromPrimitive, Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum RefTyp {
     Low = 0,
     Byte = 1,
@@ -215,6 +260,34 @@ enum RefTyp {
     Inblock = 5,
     BitAddr = 6,
     Conv = 7,
+}
+impl FromPrimitive for RefTyp {
+    fn from_i64(n: i64) -> Option<Self> {
+        match n {
+            0 => Some(RefTyp::Low),
+            1 => Some(RefTyp::Byte),
+            2 => Some(RefTyp::Relative),
+            3 => Some(RefTyp::High),
+            4 => Some(RefTyp::Word),
+            5 => Some(RefTyp::Inblock),
+            6 => Some(RefTyp::BitAddr),
+            7 => Some(RefTyp::Conv),
+            _ => None
+        }
+    }
+    fn from_u64(n: u64) -> Option<Self> {
+        match n {
+            0 => Some(RefTyp::Low),
+            1 => Some(RefTyp::Byte),
+            2 => Some(RefTyp::Relative),
+            3 => Some(RefTyp::High),
+            4 => Some(RefTyp::Word),
+            5 => Some(RefTyp::Inblock),
+            6 => Some(RefTyp::BitAddr),
+            7 => Some(RefTyp::Conv),
+            _ => None
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

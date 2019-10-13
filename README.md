@@ -1,7 +1,7 @@
 # at51
 
 [![Build Status](https://travis-ci.org/8051Enthusiast/at51.svg?branch=master)](https://travis-ci.org/8051Enthusiast/at51)
-[![Crates.io](https://img.shields.io/crates/v/at51)](https://img.shields.io/crates/v/at51)
+[![Crates.io](https://img.shields.io/crates/v/at51)](https://crates.io/crates/at51)
 
 A bunch of applications for the purpose of reverse engineering 8051 firmware.
 Currently, there are four applications:
@@ -27,7 +27,7 @@ If you get an offset near the end of the space like `0xff80`, this probably mean
 
 ### libfind
 This application loads some libraries given by the user and tries to find the functions inside the firmware.
-Right now, only OMF-51 libraries are supported, which is the format used by the C51 suite and seems to be how most 8051 firmware is actually created.
+Right now, OMF-51 libraries are supported, which is the format used by the C51 suite and seems to be how most 8051 firmware is actually created.
 
 The relevant libraries are of the form C51\*.LIB (not C[XHD]51\*.LIB) and can currently be found on the internet just by searching for then, but you can of course also try to download the trial version of C51 to get the libraries from there.
 
@@ -54,12 +54,15 @@ Address | Name                 | Description
 0x438b    ?C?PSTXDATA            general pointer store to xdata
 0x4394    ?C?CCASE              
 0x43ba    ?C?ICASE              
-0x46f5    ?C_START              
+0x46f5    \[?C_START\]            
 0x50e1    (MAIN)                
 ```
 
 For some symbol names, which are in a general form, there are descriptions available.
-Symbols embedded in parens are found only through references of other functions.
+Symbols embedded in parens are found only through references of other functions, symbols in brackets have some missing dependencies (meaning that functions they point to don't exist).
+
+Experimental support for sdld libraries (used by sdcc) is also included.
+Note that there is more noise because the external symbol definition inside the object file doesn't define whether a symbol refers to code.
 
 ### kinit
 This application is very specific to C51 generated code in that it decodes a specific data structure used to initialize memory values on startup.

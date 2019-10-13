@@ -410,6 +410,7 @@ impl Mode {
     fn get_fixup_function(
         self,
         format_tuple: (Radix, Endian, u8),
+        offset: usize
     ) -> impl Fn(&[u8], usize) -> usize {
         move |bytes, addr| {
             let jump_type = self.get_jump_type();
@@ -438,10 +439,30 @@ impl Mode {
                 }
                 JumpType::Other => 0,
             };
+            let mut offset_signed = offset;
             // make signed if the bits say so
-            if !self.contains(Mode::UNSIGNED) && (target_address & 1 << high_bit) != 0 {
-                target_address = target_address.wrapping_sub(2 * (1 << high_bit));
+            if !self.contains(Mode::UNSIGNED) {
+                if (target_address & 1 << high_bit) != 0 {
+                    target_address = target_address.wrapping_sub(2 * (1 << high_bit));
+                }
+                let offset_high_bit = match self.get_jump_type() {
+                    JumpType::Addr11 | JumpType::Addr16 => 15,
+                    JumpType::Addr19 | JumpType::Addr24 => 23,
+                    JumpType::Byte => 7,
+                    JumpType::Other => {
+                        if self.contains(Mode::THREE_BYTES) {
+                            23
+                        }
+                        else {
+                            15
+                        }
+                    }
+                };
+                if (offset & 1 << offset_high_bit) != 0 {
+                    offset_signed = offset.wrapping_sub(2 * (1 << offset));
+                }
             }
+            target_address -= offset_signed;
             // the jump is relative to the current address and not absolute
             if self.contains(Mode::PC_RELATIVE) {
                 if self.contains(Mode::BYTE) {
@@ -449,6 +470,7 @@ impl Mode {
                 } else {
                     target_address -= addr + 2;
                 }
+
             // addr11 (and addr19) jumps within the same block (relative to pc at next instruction)
             } else if self.is_addr11() {
                 target_address = target_address & 0x7ff | (addr + 2) & 0xf800;
@@ -722,24 +744,26 @@ fn process_relocs(
     // beginning of the T-line and not just the content
     let mut full_array = vec![(0, 0, false); usize::from(module.format.2)];
     full_array.append(&mut con_array);
+    let mut offset_array = Vec::new();
     for frag in &rel.frags {
         // invalid (at least I hope that it is invalid) relocation into offset
         if frag.offset < module.format.2 {
             continue;
         }
         // apply relocation to content
-        frag.mode
-            .modify_cmf_to_fixup(&mut full_array[usize::from(frag.offset)..], module.format);
+        offset_array.push(frag.mode
+            .modify_cmf_to_fixup(&mut full_array[usize::from(frag.offset)..], module.format));
     }
     let (content_mask, fixups) = content_mask_fixup;
     let mut new_content_index = 0;
     let mut cmf_index = rel.content.offset as usize;
     while cmf_index < content_mask.len() && new_content_index < full_array.len() {
         // all relocations that apply to the current offset
-        for frag in rel
+        for (i,frag) in rel
             .frags
             .iter()
-            .filter(|x| usize::from(x.offset) == new_content_index)
+            .enumerate()
+            .filter(|(_,x)| usize::from(x.offset) == new_content_index)
         {
             // we want to be sure that we have all information, which
             // we don't have when only the lowest of three bytes is written
@@ -782,7 +806,7 @@ fn process_relocs(
             fixups.push(super::Fixup::new(
                 cmf_index,
                 frag.mode.get_onsite_size(),
-                Box::new(frag.mode.get_fixup_function(module.format)),
+                Box::new(frag.mode.get_fixup_function(module.format, offset_array[i])),
                 code_ref,
             ));
         }

@@ -323,7 +323,7 @@ impl SegmentCollection {
                         (_, None) => false,
                     }
                 }
-                invalid &= !checkref;
+                invalid &= checkref;
                 // short segments can create a lot of noise and we don't really care for them
                 // anyway
                 let active_bytes: usize = self.segments[segindex]
