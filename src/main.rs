@@ -182,7 +182,6 @@ fn main() {
                 .iter()
                 .map(|x| x / base_arg.occurrences_of("file") as f64)
                 .collect();
-            println!("Index by likeliness:");
             if base_arg.is_present("json") {
                 let json_str = serde_json::to_string(&mean).unwrap_or_else(|err| {
                     eprintln!("Could not print json: {}", err);
@@ -190,6 +189,7 @@ fn main() {
                 });
                 println!("{}", json_str);
             } else {
+                println!("Index by likeliness:");
                 for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
                     println!("\t{}: {:#04x} with {}", i + 1, index, value);
                 }
@@ -198,8 +198,6 @@ fn main() {
         ("libfind", Some(find_arg)) => {
             let filename = find_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
-//            let mut pubnames: Vec<Vec<libfind::Pubsymref>> = vec![Vec::new(); contents.len()];
-//            let mut refnames: Vec<Vec<String>> = vec![Vec::new(); 0x10000];
             let check = !find_arg.is_present("no-check");
             let libnames: Vec<_> = find_arg.values_of("libraries").unwrap().collect();
             let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check).unwrap_or_else(|err| {
