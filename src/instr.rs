@@ -356,3 +356,38 @@ impl<'a> Iterator for Instructeam<'a> {
         }
     }
 }
+
+impl<'a> Instruction<'a> {
+    /// Given a instruction, this function returns the jump address of the jump if it is a jump
+    /// instruction, else None.
+    /// If the instruction is not within the first 64k bytes, the jump addresses is in the same 64k
+    /// block.
+    pub fn get_jump_target(&self) -> Option<usize> {
+        let in_block = match self.itype {
+            InsType::LJMP | InsType::LCALL => {
+                usize::from(self.bytes[1]) << 8 | usize::from(self.bytes[2])
+            }
+            InsType::AJMP | InsType::ACALL => {
+                usize::from(self.bytes[1])
+                    | ((usize::from(self.bytes[0]) & 0xe0) << 3)
+                    | ((self.pos + 2) & 0xf800)
+            }
+            InsType::SJMP
+            | InsType::JZ
+            | InsType::JNZ
+            | InsType::JC
+            | InsType::JNC
+            | InsType::JNB
+            | InsType::JB
+            | InsType::JBC
+            | InsType::CJNE
+            | InsType::DJNZ => usize::wrapping_add(
+                usize::wrapping_add(self.pos, self.bytes.len()),
+                *self.bytes.last().unwrap() as i8 as usize,
+            ),
+            _ => return None,
+        };
+        // modify to be within 64k block
+        Some(!0xffff & self.pos | in_block & 0xffff)
+    }
+}

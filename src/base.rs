@@ -1,5 +1,5 @@
 //! Module for finding the base address of a misaligned 8051 firmware
-use crate::instr::{InsType, Instructeam, Instruction};
+use crate::instr::{InsType, Instructeam};
 use rustfft::algorithm::Radix4;
 use rustfft::num_complex::Complex;
 use rustfft::FFT;
@@ -46,18 +46,17 @@ pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
     // code)
     // this reduces noise that could be introduced by regarding immediate values
     // or similar opcode arguments as jump/call instructions
-    for Instruction { itype, bytes, pos } in Instructeam::new(buf) {
-        match itype {
+    for ins in Instructeam::new(buf) {
+        match ins.itype {
             InsType::LJMP | InsType::LCALL => {
                 // mark the target addresses in the target address array
-                let target = bytes[2] as usize | (256 * bytes[1] as usize);
+                let target = ins.get_jump_target().unwrap();
                 ljmps[target] += 1;
             }
             InsType::AJMP | InsType::ACALL => {
                 if acall {
                     // find the target address of the ajmp/acall instruction
-                    let target =
-                        bytes[1] as usize | (8 * (bytes[0] as usize & 0xe0)) | ((pos + 2) & 0xf800);
+                    let target = ins.get_jump_target().unwrap();
                     ajmps[target] += 1;
                     // for different base addresses, the relative target address of two different ajmps can
                     // vary by 2048, so we just note both possibilities in the array
@@ -66,7 +65,7 @@ pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
             }
             InsType::RET => {
                 // mark the address after the ret instruction
-                rets[(pos + 1) % 65536] += 1;
+                rets[(ins.pos + 1) % 65536] += 1;
             }
             _ => {}
         }

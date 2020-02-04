@@ -1,4 +1,5 @@
 //! Provides some statistical information on the "8051ness" of regions of a file
+use crate::instr::{InsType, Instructeam};
 use lazy_static::lazy_static;
 use std::vec::Vec;
 
@@ -48,7 +49,7 @@ pub fn stat_blocks(
     blocksize: usize,
     blockfun: fn(&[usize], usize, &[f64]) -> f64,
     freqinfo: Option<&FreqInfo>,
-) -> Vec<f64> {
+) -> Vec<(f64, usize)> {
     // the maximum instruction size is 3, make sure we have at least one instruction in each block
     // (not that blocksizes this small would make sense anyway)
     if blocksize < 3 {
@@ -63,7 +64,10 @@ pub fn stat_blocks(
     for instr in crate::instr::Instructeam::new(buf) {
         // if new block begins
         if instr.pos / blocksize > prev_block {
-            ret.push(blockfun(&freq, block_n, &actual_freqinfo.relative_freqency));
+            ret.push((
+                blockfun(&freq, block_n, &actual_freqinfo.relative_freqency),
+                block_n,
+            ));
             prev_block = instr.pos / blocksize;
             block_n = 0;
             for x in &mut freq {
@@ -73,7 +77,77 @@ pub fn stat_blocks(
         block_n += 1;
         freq[actual_freqinfo.group_map[instr.bytes[0] as usize] as usize] += 1;
     }
-    ret.push(blockfun(&freq, block_n, &actual_freqinfo.relative_freqency));
+    ret.push((
+        blockfun(&freq, block_n, &actual_freqinfo.relative_freqency),
+        block_n,
+    ));
+    ret
+}
+
+/// Counts the percentage of instructions whose jump address does not align with the instruction
+/// stream
+/// buf: firmware
+/// blocksize: size of blocks where percentage is calculated
+/// abs: whether to include absolute jumps and block jumps (ajmp/acall)
+/// count_outside: whether to include jumps outside of the buffer
+pub fn instr_align_count(
+    buf: &[u8],
+    blocksize: usize,
+    abs: bool,
+    count_outside: bool,
+) -> Vec<(f64, usize)> {
+    if blocksize < 3 {
+        panic!("Blocksize needs to be at least 3");
+    }
+    let mut is_instr_start = Vec::new();
+    // record which bytes are the start of an instruction,
+    // assuming a continuous instruction stream
+    for instr in Instructeam::new(buf) {
+        if let InsType::RESRV = *instr.itype {
+            is_instr_start.push(false);
+        } else {
+            is_instr_start.push(true);
+        }
+        for _ in 1..instr.bytes.len() {
+            is_instr_start.push(false);
+        }
+    }
+    // there might be a byte near the end whose instruction is
+    // longer than the file end, so we add that here
+    for _ in 0..(buf.len() - is_instr_start.len()) {
+        is_instr_start.push(false);
+    }
+    let mut ret = Vec::new();
+    let mut prev_block = 0;
+    let mut block_jumps = 0usize;
+    let mut block_aligns = 0usize;
+    for instr in Instructeam::new(buf) {
+        if instr.pos / blocksize > prev_block {
+            // begin new block
+            ret.push((1.0 - block_aligns as f64 / block_jumps as f64, block_jumps));
+            block_aligns = 0;
+            block_jumps = 0;
+            prev_block = instr.pos / blocksize;
+        }
+        if let Some(target) = instr.get_jump_target() {
+            let is_abs = match instr.itype {
+                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL => true,
+                _ => false,
+            };
+            // count number of valid aligned jumps
+            if (abs || !is_abs) && (count_outside || target < is_instr_start.len()) {
+                block_jumps += 1;
+            }
+            // count number of all valid jumps
+            if let Some(true) = is_instr_start.get(target) {
+                if abs || !is_abs {
+                    block_aligns += 1;
+                }
+            }
+        }
+    }
+    // push last remaining block
+    ret.push((1.0 - block_aligns as f64 / block_jumps as f64, block_jumps));
     ret
 }
 

@@ -4,7 +4,7 @@ pub mod kinit;
 pub mod libfind;
 pub mod stat;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgGroup, SubCommand};
 use std::fs::File;
 use std::io::Read;
 use std::process;
@@ -103,22 +103,47 @@ fn main() {
                 .arg(
                     Arg::with_name("kullback-leibler")
                         .help("Use Kullback-Leibler divergence (default)")
-                        .conflicts_with("square-chi")
                         .short("k")
                         .long("kullback-leibler"),
                 )
                 .arg(
-                    Arg::with_name("square-chi")
-                        .help("Use square-chi error")
+                    Arg::with_name("chi-squared")
+                        .help("Use chi-squared error")
                         .short("x")
-                        .long("square-chi"),
+                        .long("chi-squared"),
+                )
+                .arg(
+                    Arg::with_name("aligned-jump")
+                        .help("Use percentage of non-aligned jumps")
+                        .short("a")
+                        .long("aligned-jump")
+                )
+                .arg(
+                    Arg::with_name("count-absolute")
+                        .help("When using aligned-jump, also include absolute jumps")
+                        .short("A")
+                        .long("count-absolute")
+                )
+                .arg(
+                    Arg::with_name("count-outside")
+                        .help("When using aligned-jump, also include jumps to outside of firmware as misses")
+                        .short("O")
+                        .long("count-outside")
+                )
+                .arg(
+                    Arg::with_name("number-data")
+                        .help("Also outputs the number of datapoints used in each block")
+                        .short("n")
+                        .long("number-data")
                 )
                 .arg(
                     Arg::with_name("file")
-                        .help("File to find 8051 instruction frequencies of")
+                        .help("File to get 8051 statistics from")
                         .required(true)
                         .index(1),
-                ),
+                )
+            .group(ArgGroup::with_name("mode")
+                   .args(&["kullback-leibler", "chi-squared", "aligned-jump"]))
         )
         .subcommand(
             SubCommand::with_name("kinit")
@@ -207,10 +232,11 @@ fn main() {
             let contents = read_whole_file_by_name(filename);
             let check = !find_arg.is_present("no-check");
             let libnames: Vec<_> = find_arg.values_of("libraries").unwrap().collect();
-            let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check).unwrap_or_else(|err| {
-                eprintln!("Could not process library files: {}", err);
-                process::exit(2);
-            });
+            let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check)
+                .unwrap_or_else(|err| {
+                    eprintln!("Could not process library files: {}", err);
+                    process::exit(2);
+                });
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
             if find_arg.is_present("json") {
                 let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {
@@ -243,21 +269,42 @@ fn main() {
                     process::exit(2);
                 })
             });
-            let statfunction = if stat_arg.is_present("square-chi") {
-                stat::square_chi
+            let blocks = if stat_arg.is_present("chi-squared") {
+                stat::stat_blocks(&contents, blocksize, stat::square_chi, corpus.as_ref())
+            } else if stat_arg.is_present("kullback-leibler") {
+                stat::stat_blocks(
+                    &contents,
+                    blocksize,
+                    stat::kullback_leibler,
+                    corpus.as_ref(),
+                )
             } else {
-                stat::kullback_leibler
+                stat::instr_align_count(
+                    &contents,
+                    blocksize,
+                    stat_arg.is_present("count-absolute"),
+                    stat_arg.is_present("count-outside"),
+                )
             };
-            let blocks = stat::stat_blocks(&contents, blocksize, statfunction, corpus.as_ref());
+            let is_n = stat_arg.is_present("number-data");
             if stat_arg.is_present("json") {
-                let json_str = serde_json::to_string(&blocks).unwrap_or_else(|err| {
+                let json_str = if is_n {
+                    serde_json::to_string(&blocks)
+                } else {
+                    serde_json::to_string(&blocks.iter().map(|(x, _)| x).collect::<Vec<_>>())
+                }
+                .unwrap_or_else(|err| {
                     eprintln!("Could not print json: {}", err);
                     process::exit(2);
                 });
                 println!("{}", json_str);
             } else {
-                for (i, x) in blocks.iter().enumerate() {
-                    println!("{:#04x}: {}", i * blocksize, x);
+                for (i, (x, n)) in blocks.iter().enumerate() {
+                    if is_n {
+                        println!("{:#04x}: {} {}", i * blocksize, x, n)
+                    } else {
+                        println!("{:#04x}: {}", i * blocksize, x)
+                    }
                 }
             }
         }
