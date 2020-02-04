@@ -1,3 +1,8 @@
+Current dev
+===========
+* Added new statistic "jump-align" which counts the percentage of instructions that jump to unaligned addresses
+* Tried to improve documentation
+
 0.3.0 (2019-10-17)
 ==================
 * Implement Aslink3/sdcc library files 
