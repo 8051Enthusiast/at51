@@ -102,9 +102,16 @@ fn main() {
                 )
                 .arg(
                     Arg::with_name("kullback-leibler")
-                        .help("Use Kullback-Leibler divergence instead of square-chi")
+                        .help("Use Kullback-Leibler divergence (default)")
+                        .conflicts_with("square-chi")
                         .short("k")
                         .long("kullback-leibler"),
+                )
+                .arg(
+                    Arg::with_name("square-chi")
+                        .help("Use square-chi error")
+                        .short("x")
+                        .long("square-chi"),
                 )
                 .arg(
                     Arg::with_name("file")
@@ -236,10 +243,10 @@ fn main() {
                     process::exit(2);
                 })
             });
-            let statfunction = if stat_arg.is_present("kullback-leibler") {
-                stat::kullback_leibler
-            } else {
+            let statfunction = if stat_arg.is_present("square-chi") {
                 stat::square_chi
+            } else {
+                stat::kullback_leibler
             };
             let blocks = stat::stat_blocks(&contents, blocksize, statfunction, corpus.as_ref());
             if stat_arg.is_present("json") {
