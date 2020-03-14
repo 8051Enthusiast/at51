@@ -8,20 +8,20 @@ edition = "2018"
 keywords = ["reverse-engineering", "8051"]
 categories = ["command-line-utilities"]
 license = "MIT"
-travis-ci = { repository = "8051Enthusiast/at51", branch = "master" }
 repository = "https://github.com/8051Enthusiast/at51"
 
 
 [dependencies]
 clap = "~2.33.0"	# cl arg parsing
 rustfft = "~3.0.0"	# base address finding
-nom = "~5.0.0"		# parse libraries, init structure
+nom = "~5.1.0"		# parse libraries, init structure
 num-traits = "^0.2"	# omf51 parsing
 lazy_static = "1.4.0"	# for some default values
 ar = "^0.8.0"		# for sdcc library, which is an bsd ar archive
 bitflags = "^1.2.0"	# for sdcc library
 serde_json = "1.0"	# json output
 serde = { version = "1.0", features = ["derive"] }
+dirs = "^2.0.0"
 
 [dev-dependencies]
 hex = "~0.4.0"		# used for omf51 tests

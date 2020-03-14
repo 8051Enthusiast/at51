@@ -1,13 +1,9 @@
 language: rust
 rust:
-  - stable
-  - beta
-  - nightly
+- stable
 matrix:
-  allow_failures:
-    - rust: nightly
   fast_finish: true
 os:
-  - windows
-  - linux
-  - osx
+- windows
+- linux
+- osx

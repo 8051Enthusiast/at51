@@ -1,8 +1,7 @@
 //! Module for finding the base address of a misaligned 8051 firmware
 use crate::instr::{InsType, Instructeam};
-use rustfft::algorithm::Radix4;
 use rustfft::num_complex::Complex;
-use rustfft::FFT;
+use rustfft::FFTplanner;
 
 /// Finds the base address of a misaligned 8051 firmware image.
 ///
@@ -32,13 +31,15 @@ use rustfft::FFT;
 /// * `acall` - whether to include acall/ajmp in the calculation (this
 /// can introduce a lot of noise)
 ///
-pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
-    let mut rets = vec![0 as u16; 65536];
-    let mut ljmps = vec![0 as u16; 65536];
+pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
+    assert!(buf.len() <= 0x10000);
+    let total_size = if cyclic { 0x10000 } else { 0x10000 * 2 };
+    let mut rets = vec![0u16; total_size];
+    let mut ljmps = vec![0u16; total_size];
     let mut ajmps = if acall {
-        vec![0; 65536]
+        vec![0; total_size]
     } else {
-        vec![0 as u16; 0]
+        vec![0u16; 0]
     };
     // we pretend that the whole image is instructions that come right after another
     // While that is generally wrong for the whole image, this normally converges
@@ -60,12 +61,14 @@ pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
                     ajmps[target] += 1;
                     // for different base addresses, the relative target address of two different ajmps can
                     // vary by 2048, so we just note both possibilities in the array
-                    ajmps[(target + 2048) % 65536] += 1;
+                    let second_target = (target + 2048) & 0xffff | target & !0xffff;
+                    ajmps[second_target] += 1;
                 }
             }
-            InsType::RET => {
+            InsType::RET | InsType::RETI => {
                 // mark the address after the ret instruction
-                rets[(ins.pos + 1) % 65536] += 1;
+                let ret_loc = (ins.pos + 1) & 0xffff | ins.pos & !0xffff;
+                rets[ret_loc] += 1;
             }
             _ => {}
         }
@@ -78,14 +81,23 @@ pub fn find_base(buf: &[u8], acall: bool) -> Vec<f64> {
         // for acalls, we only care about the first 2048 bytes (the size of a block)
         // and repeat that accross the whole address space, since it is periodic in
         // with that period (since it corresponds to moving the code block by 2048 bytes)
-        mean = cross_correlate(&rets, &ajmps)
-            .iter()
-            .take(2048)
-            .cycle()
-            .take(65536)
-            .zip(mean.iter())
-            .map(|(x, y)| (f64::from(x.re.round()) + y) / 2.0)
-            .collect();
+        let ajmps = cross_correlate(&rets, &ajmps);
+        for (i, x) in ajmps.iter().take(2048).cycle().take(0x10000).enumerate() {
+            mean[i] = (mean[i] + f64::from(x.re)) / 2.0;
+        }
+        if !cyclic {
+            let mlen = mean.len();
+            for (i, x) in ajmps
+                .iter()
+                .take(2048)
+                .rev()
+                .cycle()
+                .take(0x10000)
+                .enumerate()
+            {
+                mean[mlen - 1 - i] = (mean[mlen - 1 - i] + f64::from(x.re)) / 2.0;
+            }
+        }
     }
     mean
 }
@@ -107,25 +119,28 @@ pub fn maxidx(arr: &[f64], num: usize) -> Vec<(usize, f64)> {
     maxidx
 }
 
-// a helper function for a circular cross-correlation of size 2¹⁶
-// (the size of the code space of a conventional 8051 core)
+// a helper function for a circular cross-correlation
 // converts integers to floats, which can result in a bit of imprecision,
 // but this hasn't been an issue yet since we're only searching for a
 // maximum anyway and not a specific value (and the maximum is often
 // 10x as big as the next lower value)
 fn cross_correlate(a: &[u16], b: &[u16]) -> Vec<Complex<f32>> {
-    let fft = Radix4::new(65536, false);
-    let ifft = Radix4::new(65536, true);
-    let u16_to_complex = |scl: &u16| Complex::new(f32::from(*scl), 0.0);
+    let len = a.len();
+    assert_eq!(len, b.len());
+    let mut fft_plan = FFTplanner::new(false);
+    let mut ifft_plan = FFTplanner::new(true);
+    let fft = fft_plan.plan_fft(len);
+    let ifft = ifft_plan.plan_fft(len);
+    let u16_to_complex = |scl: &u16| Complex::new(*scl as f32, 0.0);
     let mut fa: Vec<Complex<f32>> = a.iter().map(u16_to_complex).collect();
     let mut fb: Vec<Complex<f32>> = b.iter().map(u16_to_complex).collect();
-    let mut out = vec![Complex::new(0.0, 0.0); 65536];
+    let mut out = vec![Complex::new(0.0, 0.0); len];
     fft.process(&mut fa, &mut out);
     fft.process(&mut fb, &mut fa);
     fb = fa
         .iter()
         .zip(out.iter())
-        .map(|(a, b)| b.conj() * a / 65536.0)
+        .map(|(a, b)| b.conj() * a / len as f32)
         .collect();
     ifft.process(&mut fb, &mut out);
     out

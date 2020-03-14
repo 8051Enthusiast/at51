@@ -35,7 +35,9 @@ Note that random data is only at roughly 0.25, so the Kullback-Leibler might not
 An alternative is a chi squared test on the distribution of opcodes, which is can have a value bigger than 1 and is not constrained in its values.
 But as a downside, it is harder to say what ranges usually are 8051 code, as that changes for example with blocksize.
 It is useful for comparing the 8051-ness of different blocks and is normally more reliable thatn Kullback-Leibler divergence in that case.
-Also note that I have no experience in statistics so I maybe doing things wrong.
+Also note that I have no experience in statistics so I may be doing things wrong.
+
+One can also set the standard metric that gets used when no option is given in the [config](#config) under the name `stat_mode` with either `AlignedJump`, `SquareChi` or `KullbackLeibler`.
 
 I normally do not need the second or third option (Kullback-Leibler or chi squared) and they exist mostly because I didn't implement the first test until later.
 
@@ -45,8 +47,8 @@ at51 stat path/to/firmware | gnuplot -p -e "plot '-' with lines"
 ```
 ## base
 This application tries to determine the load address of a firmware image (which in the best case only includes the actual firmware that will be on the device).
-It loads the first 64k of a given file and for each offset determines how many `ljmp`s/`lcall`s jump right behind `ret` instructions, as that is the place where new functions normally starts.
-The offset is interpreted cyclically inside the 16-bit space, which means that at offset 0xffe0, the first 0x20 bytes are loaded at 0xffe0-0xffff and the rest is then loaded at the start of the address space.
+It loads the first 64k of a given file and for each offset from `0` to `0x10000` determines how many `ljmp`s/`lcall`s jump right behind `ret` instructions, as that is the place where new functions normally starts.
+The offset can also be interpreted cyclically inside the 16-bit space (with `-c`), which means that at offset 0xffe0, the first 0x20 bytes are loaded at 0xffe0-0xffff and the rest is then loaded at the start of the address space.
 The likeliness of the output is the amount of jumps and calls that target instructions right behind `ret`s, as in this example:
 ```
 Index by likeliness:
@@ -119,6 +121,8 @@ Note that noise with sdcc libraries might be higher, as the fixup locations in t
 It is recommended to align the file to its load address before using this, since absolute locations may fail to verify otherwise.
 Segments shorter than 4 bytes are not output, since they provide much noise and don't really add any info.
 
+A list of libraries to use if no others are given as argument can be specified in the [config](#config) using the field `"libraries"` containing a list of library paths.
+
 ### Example (on some random wifi firmware)
 
 With `at51 libfind some_random_firmware /path/to/lib/dir/`:
@@ -173,6 +177,26 @@ xdata[0x46d] = 0x00
 idata[0x5c] = 0x00
 xdata[0x403..0x40a] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 xdata[0x467] = 0x00
+```
+## Config
+A (rudimentary) config file in json format can be created at `$CONFIG_PATH/at51/config.json`, where `$CONFIG_PATH` depends on the OS.
+Following paths are normally used:
+* `~/.config` for Linux
+* `~/Library/Preferences` for macOS
+* `~/AppData/Roaming` for Windows
+
+Example config:
+```
+{
+	"libraries": [
+    "/usr/share/sdcc/lib/small",
+    "/usr/share/sdcc/lib/medium",
+    "/usr/share/sdcc/lib/large",
+    "/usr/share/sdcc/lib/huge",
+    "/opt/C51/LIB"
+  ],
+	"stat_mode": "AlignedJump"
+}
 ```
 
 ## Installation

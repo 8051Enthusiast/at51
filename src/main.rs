@@ -1,10 +1,12 @@
 pub mod base;
+mod conf;
 mod instr;
 pub mod kinit;
 pub mod libfind;
 pub mod stat;
 
 use clap::{App, Arg, ArgGroup, SubCommand};
+use conf::StatMode;
 use std::fs::File;
 use std::io::Read;
 use std::process;
@@ -37,6 +39,18 @@ fn main() {
                         .default_value("3"),
                 )
                 .arg(
+                    Arg::with_name("cyclic")
+                        .help("jaj")
+                        .short("c")
+                        .long("cyclic")
+                )
+                .arg(
+                    Arg::with_name("dump")
+                        .help("Dump the likeliness values of every address (warning: long)")
+                        .short("d")
+                        .long("dump")
+                )
+                .arg(
                     Arg::with_name("file")
                         .help("File to find base address of")
                         .required(true)
@@ -44,7 +58,7 @@ fn main() {
                         .min_values(1)
                         .max_values(32)
                         .index(1),
-                ),
+                )
         )
         .subcommand(
             SubCommand::with_name("libfind")
@@ -70,9 +84,8 @@ fn main() {
                 .arg(
                     Arg::with_name("libraries")
                         .help("OMF51 Libraries to take definitions from")
-                        .required(true)
                         .multiple(true)
-                        .min_values(1)
+                        .min_values(0)
                         .index(2),
                 ),
         )
@@ -170,12 +183,14 @@ fn main() {
                 ),
         )
         .get_matches();
+    let conf = conf::get_config();
     match cliargs.subcommand() {
+        // base handling
         ("base", Some(base_arg)) => {
             // list of files to find out alignment of
             let filenames = base_arg.values_of("file").unwrap();
             let nfiles = filenames.len();
-            let mut mean: Vec<f64> = vec![1.0; 0x10000];
+            let mut mean: Vec<f64> = vec![1.0; 0x20000];
             let acall = base_arg.is_present("acall");
             let num: usize = base_arg
                 .value_of("index-count")
@@ -190,48 +205,85 @@ fn main() {
                     eprintln!("Could not open file '{}': {}", name, err);
                     process::exit(2);
                 });
-                let mut buf = vec![0; 0x10000];
+                let mut buf = Vec::new();
                 // read only the first 2^16 bytes, since the algorithm wouldn't work otherwise
+                // and it is unclear what it would mean for 16-bit firmware
                 f.take(0x10000).read_to_end(&mut buf).unwrap_or_else(|err| {
                     eprintln!("Could not read file '{}': {}", name, err);
                     process::exit(2);
                 });
-                let match_array = base::find_base(&buf, acall);
+                let match_array = base::find_base(&buf, acall, base_arg.is_present("cyclic"));
                 mean = mean
                     .iter()
                     .zip(match_array.iter())
                     .map(|(x, y)| x + y)
                     .collect();
-                if nfiles > 1 && !base_arg.is_present("json") {
+                if nfiles > 1 && !base_arg.is_present("json") && !base_arg.is_present("dump") {
                     let (best_index, best_value) = base::maxidx(&match_array, 1)[0];
-                    println!(
-                        "Best index of '{}': {:#04x} with {}",
-                        name, best_index, best_value
-                    );
+                    let idx: isize = if best_index >= 0x10000 {
+                        best_index as isize - 2 * 0x10000
+                    } else {
+                        best_index as isize
+                    };
+                    println!("Best index of '{}': {:#04x} with {}", name, idx, best_value);
                 }
             }
             mean = mean
                 .iter()
                 .map(|x| x / base_arg.occurrences_of("file") as f64)
                 .collect();
-            if base_arg.is_present("json") {
-                let json_str = serde_json::to_string(&mean).unwrap_or_else(|err| {
-                    eprintln!("Could not print json: {}", err);
-                    process::exit(2);
-                });
-                println!("{}", json_str);
-            } else {
-                println!("Index by likeliness:");
-                for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
-                    println!("\t{}: {:#04x} with {}", i + 1, index, value);
+            match (base_arg.is_present("dump"), base_arg.is_present("json")) {
+                (true, true) => {
+                    let json_str = serde_json::to_string(&mean).unwrap_or_else(|err| {
+                        eprintln!("Could not create json: {}", err);
+                        process::exit(2);
+                    });
+                    println!("{}", json_str);
+                }
+                (true, false) => {
+                    for x in mean {
+                        println!("{}", x);
+                    }
+                }
+                (false, true) => {
+                    let json_str =
+                        serde_json::to_string(&base::maxidx(&mean, num)).unwrap_or_else(|err| {
+                            eprintln!("Could not create json: {}", err);
+                            process::exit(2);
+                        });
+                    println!("{}", json_str);
+                }
+                (false, false) => {
+                    println!("Index by likeliness:");
+                    for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
+                        let nidx: isize = if *index >= 0x10000 {
+                            *index as isize - 2 * 0x10000
+                        } else {
+                            *index as isize
+                        };
+                        let sign = if nidx < 0 { '-' } else { ' ' };
+                        println!("\t{}: {}{:#04x} with {}", i + 1, sign, nidx.abs(), value);
+                    }
                 }
             }
         }
+
+        // libfind handling
         ("libfind", Some(find_arg)) => {
             let filename = find_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
             let check = !find_arg.is_present("no-check");
-            let libnames: Vec<_> = find_arg.values_of("libraries").unwrap().collect();
+            let mut libnames: Vec<_> = find_arg.values_of("libraries").unwrap_or_default().collect();
+            if libnames.len() == 0 {
+                libnames = match &conf.libraries {
+                    Some(libs) => libs.iter().map(|x| x.as_str()).collect(),
+                    None => Vec::new(),
+                }
+            }
+            if libnames.len() == 0 {
+                eprintln!("No libraries given and none in config");
+                process::exit(2);
+            }
             let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check)
                 .unwrap_or_else(|err| {
                     eprintln!("Could not process library files: {}", err);
@@ -248,9 +300,20 @@ fn main() {
                 libfind::print_segrefs(&segrefs);
             }
         }
+
+        // stat handling
         ("stat", Some(stat_arg)) => {
             let filename = stat_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
+            let mode = if stat_arg.is_present("chi-squared") {
+                StatMode::SquareChi
+            } else if stat_arg.is_present("kullback-leibler") {
+                StatMode::KullbackLeibler
+            } else if stat_arg.is_present("aligned-jump") {
+                StatMode::AlignedJump
+            } else {
+                conf.stat_mode.unwrap_or_default()
+            };
             let blocksize: usize = stat_arg
                 .value_of("blocksize")
                 .unwrap()
@@ -269,22 +332,22 @@ fn main() {
                     process::exit(2);
                 })
             });
-            let blocks = if stat_arg.is_present("chi-squared") {
-                stat::stat_blocks(&contents, blocksize, stat::square_chi, corpus.as_ref())
-            } else if stat_arg.is_present("kullback-leibler") {
-                stat::stat_blocks(
+            let blocks = match mode {
+                StatMode::SquareChi => {
+                    stat::stat_blocks(&contents, blocksize, stat::square_chi, corpus.as_ref())
+                }
+                StatMode::KullbackLeibler => stat::stat_blocks(
                     &contents,
                     blocksize,
                     stat::kullback_leibler,
                     corpus.as_ref(),
-                )
-            } else {
-                stat::instr_align_count(
+                ),
+                StatMode::AlignedJump => stat::instr_align_count(
                     &contents,
                     blocksize,
                     stat_arg.is_present("count-absolute"),
                     stat_arg.is_present("count-outside"),
-                )
+                ),
             };
             let is_n = stat_arg.is_present("number-data");
             if stat_arg.is_present("json") {
@@ -308,6 +371,8 @@ fn main() {
                 }
             }
         }
+
+        // kinit handling
         ("kinit", Some(kinit_arg)) => {
             let filename = kinit_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
