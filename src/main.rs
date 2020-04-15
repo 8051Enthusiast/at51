@@ -13,7 +13,7 @@ use std::process;
 
 fn main() {
     let cliargs = App::new("at51")
-        .version("0.2.0")
+        .version("0.4.1")
         .about("Applications for reverse engineering architecture 8051 firmware")
         .subcommand(
             SubCommand::with_name("base")
@@ -274,13 +274,13 @@ fn main() {
             let contents = read_whole_file_by_name(filename);
             let check = !find_arg.is_present("no-check");
             let mut libnames: Vec<_> = find_arg.values_of("libraries").unwrap_or_default().collect();
-            if libnames.len() == 0 {
+            if libnames.is_empty() {
                 libnames = match &conf.libraries {
                     Some(libs) => libs.iter().map(|x| x.as_str()).collect(),
                     None => Vec::new(),
                 }
             }
-            if libnames.len() == 0 {
+            if libnames.is_empty() {
                 eprintln!("No libraries given and none in config");
                 process::exit(2);
             }

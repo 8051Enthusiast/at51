@@ -87,9 +87,8 @@ pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
         }
         if !cyclic {
             let mlen = mean.len();
-            for (i, x) in ajmps
+            for (i, x) in ajmps[0..2048]
                 .iter()
-                .take(2048)
                 .rev()
                 .cycle()
                 .take(0x10000)
