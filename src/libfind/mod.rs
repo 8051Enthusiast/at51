@@ -113,7 +113,7 @@ pub fn process_segrefs<S: BuildHasher>(
         for s in arr {
             segrefs.push(Segref {
                 location: *i,
-                name: String::from(s),
+                name: s.clone(),
                 goodness: SymGoodness::RefOnly,
                 description: None,
             });
@@ -582,7 +582,7 @@ impl Fixup {
             refloc,
             size: 1,
             addr_fun: Box::new(|bytes, pos| {
-                (pos.wrapping_add(1).wrapping_add((bytes[0]) as i8 as usize))
+                pos.wrapping_add(1).wrapping_add((bytes[0]) as i8 as usize)
             }),
             code_ref,
         }

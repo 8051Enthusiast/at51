@@ -2,7 +2,7 @@
 name = "at51"
 description = "Some applications for reverse engineering 8051 firmware"
 readme = "README.md"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["8051Enthusiast"]
 edition = "2018"
 keywords = ["reverse-engineering", "8051"]

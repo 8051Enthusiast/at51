@@ -1,5 +1,6 @@
 language: rust
 rust:
+- 1.34.2
 - stable
 matrix:
   fast_finish: true
