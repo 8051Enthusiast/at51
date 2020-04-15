@@ -1,5 +1,9 @@
+0.4.1 (2020-04-15)
+==================
+* Fix debian not being able to compile because of new library features (fixes #3)
+
 0.4.0 (2020-03-14)
-===========
+==================
 * Added new statistic "jump-align" which counts the percentage of instructions that jump to unaligned addresses
 * Tried to improve documentation
 * Changed `base` to use non-cyclic mode by default (meaning that firmware doesn't wrap on 0x10000 when searching for alignment), old cyclic mode can be accessed with `--cyclic`
