@@ -5,7 +5,6 @@ use nom::{
     branch::alt,
     bytes,
     combinator::{map, verify},
-    error::ErrorKind,
     multi::{count, many0},
     number::complete::{be_u16, be_u24, be_u8},
     sequence::{pair, terminated, tuple},
@@ -104,7 +103,7 @@ pub struct InitData {
 impl InitData {
     /// reads the init structure (assuming it starts right at the beginning
     /// of i).
-    pub fn new(i: &[u8]) -> Result<Self, nom::Err<(&[u8], ErrorKind)>> {
+    pub fn new(i: &[u8]) -> Result<Self, nom::Err<nom::error::Error<&[u8]>>> {
         map(
             // the structure is 0-terminated, which is encoded into init_block itself
             terminated(many0(init_block), bytes::complete::tag(&[0][..])),
@@ -202,7 +201,6 @@ impl InitData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
     #[test]
     fn info_header_idata() {
         assert_eq!(

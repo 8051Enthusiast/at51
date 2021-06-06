@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     combinator::{complete, map, rest, verify},
-    error::ErrorKind,
+    error::Error as NomError,
     multi::{length_data, length_value, many0, many1},
     number::complete::{le_u16, le_u8},
     sequence::{delimited, pair, preceded, terminated, tuple},
@@ -495,7 +495,7 @@ pub struct Omf51Objects {
 }
 
 impl Omf51Objects {
-    pub fn new(stream: &[u8]) -> Result<Self, nom::Err<(&[u8], ErrorKind)>> {
+    pub fn new(stream: &[u8]) -> Result<Self, nom::Err<NomError<&[u8]>>> {
         object_file(stream).map(|x| Omf51Objects { module: x.1 })
     }
 }
@@ -743,7 +743,6 @@ impl std::convert::TryFrom<Omf51Objects> for super::SegmentCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
 
     #[test]
     fn parse_lenstr() {

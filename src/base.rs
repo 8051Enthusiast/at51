@@ -1,7 +1,7 @@
 //! Module for finding the base address of a misaligned 8051 firmware
 use crate::instr::{InsType, Instructeam};
 use rustfft::num_complex::Complex;
-use rustfft::FFTplanner;
+use rustfft::FftPlanner;
 
 /// Finds the base address of a misaligned 8051 firmware image.
 ///
@@ -126,21 +126,16 @@ pub fn maxidx(arr: &[f64], num: usize) -> Vec<(usize, f64)> {
 fn cross_correlate(a: &[u16], b: &[u16]) -> Vec<Complex<f32>> {
     let len = a.len();
     assert_eq!(len, b.len());
-    let mut fft_plan = FFTplanner::new(false);
-    let mut ifft_plan = FFTplanner::new(true);
-    let fft = fft_plan.plan_fft(len);
-    let ifft = ifft_plan.plan_fft(len);
+    let fft = FftPlanner::new().plan_fft_forward(len);
+    let ifft = FftPlanner::new().plan_fft_inverse(len);
     let u16_to_complex = |scl: &u16| Complex::new(*scl as f32, 0.0);
     let mut fa: Vec<Complex<f32>> = a.iter().map(u16_to_complex).collect();
     let mut fb: Vec<Complex<f32>> = b.iter().map(u16_to_complex).collect();
-    let mut out = vec![Complex::new(0.0, 0.0); len];
-    fft.process(&mut fa, &mut out);
-    fft.process(&mut fb, &mut fa);
-    fb = fa
-        .iter()
-        .zip(out.iter())
-        .map(|(a, b)| b.conj() * a / len as f32)
-        .collect();
-    ifft.process(&mut fb, &mut out);
-    out
+    fft.process(&mut fa);
+    fft.process(&mut fb);
+    for (a, b) in fa.iter_mut().zip(fb.iter()) {
+        *a = a.conj() * b / len as f32
+    }
+    ifft.process(&mut fa);
+    fa
 }

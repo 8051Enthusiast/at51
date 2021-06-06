@@ -14,7 +14,7 @@ use nom::{
         digit1, hex_digit1, line_ending, multispace0, none_of, oct_digit1, one_of, space0, space1,
     },
     combinator::{map, map_opt, map_res, opt, verify},
-    multi::{fold_many0, fold_many_m_n, many0, many1},
+    multi::{fold_many_m_n, many0, many1, separated_list0, separated_list1},
     sequence::{delimited, preceded, tuple},
     IResult,
 };
@@ -82,38 +82,6 @@ fn parse_byte(format_tuple: (Radix, Endian, u8)) -> impl Fn(&str) -> IResult<&st
     move |i| map_res(parse_number(format_tuple), std::convert::TryFrom::try_from)(i)
 }
 
-// parses a list of a given parser with spaces inbetween with at least 1 element
-fn space_list_many1<'a, T, U>(f: U) -> impl Fn(&'a str) -> IResult<&'a str, Vec<T>>
-where
-    U: Fn(&'a str) -> IResult<&'a str, T>,
-    T: Clone,
-{
-    move |i| {
-        // parse the first element
-        f(i).and_then(|(j, n)| {
-            // and then parse the following elements, folding them into a vector
-            fold_many0(preceded(space1, &f), vec![n], |mut m, k| {
-                m.push(k);
-                m
-            })(j)
-        })
-    }
-}
-
-// also allows zero elements, but requires that a space be at the beginning
-// note: includes space at beginning
-fn space_list_many0<'a, T, U>(f: U) -> impl Fn(&'a str) -> IResult<&'a str, Vec<T>>
-where
-    U: Fn(&'a str) -> IResult<&'a str, T>,
-    T: Clone,
-{
-    move |i| {
-        map(opt(preceded(space1, space_list_many1(&f))), |x| {
-            x.unwrap_or_else(Vec::new)
-        })(i)
-    }
-}
-
 // a list with a given number of bytes
 fn parse_byte_list(
     format_tuple: (Radix, Endian, u8),
@@ -144,7 +112,7 @@ fn parse_byte_list(
 // parses as many bytes as possible
 // note: includes space at beginning
 fn parse_byte_many(format_tuple: (Radix, Endian, u8)) -> impl Fn(&str) -> IResult<&str, Vec<u8>> {
-    move |i| space_list_many0(parse_byte(format_tuple))(i)
+    move |i| separated_list1(space1, parse_byte(format_tuple))(i)
 }
 
 // parses a number that is split into multiple bytes
@@ -531,20 +499,23 @@ fn parse_reloc_frag(
     format_tuple: (Radix, Endian, u8),
 ) -> impl Fn(&str) -> IResult<&str, Vec<Aslink3RelFrag>> {
     move |i| {
-        space_list_many0(map(
-            tuple((
-                parse_extended_mode(format_tuple),
-                space1,
-                parse_byte(format_tuple),
-                space1,
-                parse_area_index(format_tuple),
-            )),
-            |(mode, _, offset, _, symarea)| Aslink3RelFrag {
-                mode,
-                offset,
-                symarea,
-            },
-        ))(i)
+        separated_list0(
+            space1,
+            map(
+                tuple((
+                    parse_extended_mode(format_tuple),
+                    space1,
+                    parse_byte(format_tuple),
+                    space1,
+                    parse_area_index(format_tuple),
+                )),
+                |(mode, _, offset, _, symarea)| Aslink3RelFrag {
+                    mode,
+                    offset,
+                    symarea,
+                },
+            ),
+        )(i)
     }
 }
 

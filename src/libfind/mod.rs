@@ -164,7 +164,6 @@ pub fn process_segrefs<S: BuildHasher>(
                 Some("XDATA") => "xdata",
                 Some("PDATA") => "pdata (external ram)",
                 Some("IDATA") => "idata (indirect ram access)",
-                Some("DATA") => "data (direct ram access)",
                 Some("CODE") => "code space",
                 Some("OPTR") => "general pointer with offset",
                 Some("PTR") => "general pointer",
@@ -213,12 +212,11 @@ fn parse_description(i: &str) -> IResult<&str, (&str, Option<&str>, &str, Operat
             ),
             map(
                 tuple((
-                    alt((tag("LDI"), tag("LD"), tag("ILD"), tag("STK"), tag("ST"))),
+                    alt((tag("LD"), tag("LDI"), tag("ILD"), tag("STK"), tag("ST"))),
                     alt((
                         tag("XDATA"),
                         tag("PDATA"),
                         tag("IDATA"),
-                        tag("DATA"),
                         tag("CODE"),
                         tag("OPTR"),
                         tag("PTR"),
