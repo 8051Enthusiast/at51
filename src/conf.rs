@@ -1,4 +1,4 @@
-use dirs_next::config_dir;
+use dirs::config_dir;
 use serde::Deserialize;
 use std::fs::File;
 
