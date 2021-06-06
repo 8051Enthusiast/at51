@@ -668,7 +668,7 @@ fn parse_module(i: &str) -> IResult<&str, Aslink3Mod> {
                     format: form,
                     areas: area_vec,
                     syms: sym_vec,
-                    rels: rels.into_iter().filter_map(|x| x).collect(),
+                    rels: rels.into_iter().flatten().collect(),
                 }
             },
         )(j)
@@ -692,14 +692,10 @@ impl Aslink3Objects {
             let mut buf = Vec::new();
             entry.read_to_end(&mut buf)?;
             // It should be ascii, so just assume it is utf8
-            let string = std::str::from_utf8(&buf[..]).or_else(|_| {
-                Err(Error::new(
-                    ErrorKind::InvalidData,
-                    "Invalid characters in module",
-                ))
-            })?;
+            let string = std::str::from_utf8(&buf[..])
+                .map_err(|_| Error::new(ErrorKind::InvalidData, "Invalid characters in module"))?;
             let (_, parsed_module) = parse_module(string)
-                .or_else(|_| Err(Error::new(ErrorKind::InvalidData, "Could not parse module")))?;
+                .map_err(|_| Error::new(ErrorKind::InvalidData, "Could not parse module"))?;
             objarr.push(parsed_module);
         }
         Ok(Aslink3Objects { objects: objarr })

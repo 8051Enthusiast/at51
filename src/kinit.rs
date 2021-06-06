@@ -14,11 +14,11 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq)]
 enum DataType {
-    IDATA,
-    XDATA,
-    PDATA,
-    BIT,
-    HDATA,
+    Idata,
+    Xdata,
+    Pdata,
+    Bit,
+    Hdata,
 }
 
 #[derive(Debug, PartialEq)]
@@ -52,12 +52,12 @@ fn info_header(i: &[u8]) -> IResult<&[u8], InfoHeader> {
         ),
         |(typ, big_bit, len): (u8, u8, u16)| InfoHeader {
             data_type: match (typ, big_bit) {
-                (0, _) => DataType::IDATA,
-                (1, _) => DataType::XDATA,
-                (2, _) => DataType::PDATA,
-                (3, 0) => DataType::BIT,
+                (0, _) => DataType::Idata,
+                (1, _) => DataType::Xdata,
+                (2, _) => DataType::Pdata,
+                (3, 0) => DataType::Bit,
                 // if BIG BIT is set and the data_type is set as BIT, it is actually HDATA
-                (3, 1) => DataType::HDATA,
+                (3, 1) => DataType::Hdata,
                 // this shouldn't happen because the value is only 2 bits wide
                 _ => panic!("A number that shouldn't be out of range is out of range"),
             },
@@ -68,11 +68,11 @@ fn info_header(i: &[u8]) -> IResult<&[u8], InfoHeader> {
 
 #[derive(Debug, PartialEq, Serialize)]
 enum InitBlock {
-    IDATA((u8, Vec<u8>)),
-    XDATA((u16, Vec<u8>)),
-    PDATA((u8, Vec<u8>)),
-    BIT(Vec<(u8, u8)>),
-    HDATA((u32, Vec<u8>)),
+    Idata((u8, Vec<u8>)),
+    Xdata((u16, Vec<u8>)),
+    Pdata((u8, Vec<u8>)),
+    Bit(Vec<(u8, u8)>),
+    Hdata((u32, Vec<u8>)),
 }
 
 // for bits, the value is stored in the 7th bit and the rest in the lower 7 bits
@@ -82,11 +82,11 @@ fn bit_init(i: (&[u8], usize)) -> IResult<(&[u8], usize), (u8, u8)> {
 
 fn init_block(i: &[u8]) -> IResult<&[u8], InitBlock> {
     info_header(i).and_then(|(i, o)| match o.data_type {
-        DataType::IDATA => map(pair(be_u8, count(be_u8, o.len)), InitBlock::IDATA)(i),
-        DataType::XDATA => map(pair(be_u16, count(be_u8, o.len)), InitBlock::XDATA)(i),
-        DataType::PDATA => map(pair(be_u8, count(be_u8, o.len)), InitBlock::PDATA)(i),
-        DataType::BIT => map(count(bits::bits(bit_init), o.len), InitBlock::BIT)(i),
-        DataType::HDATA => map(pair(be_u24, count(be_u8, o.len)), InitBlock::HDATA)(i),
+        DataType::Idata => map(pair(be_u8, count(be_u8, o.len)), InitBlock::Idata)(i),
+        DataType::Xdata => map(pair(be_u16, count(be_u8, o.len)), InitBlock::Xdata)(i),
+        DataType::Pdata => map(pair(be_u8, count(be_u8, o.len)), InitBlock::Pdata)(i),
+        DataType::Bit => map(count(bits::bits(bit_init), o.len), InitBlock::Bit)(i),
+        DataType::Hdata => map(pair(be_u24, count(be_u8, o.len)), InitBlock::Hdata)(i),
     })
 }
 
@@ -120,19 +120,19 @@ impl InitData {
                 // for IDATA, XDATA, PDATA and HDATA, we
                 // pretty much do the same, but we have to convert
                 // the addresses to u32 to unify the printing
-                InitBlock::IDATA((addr, valvec)) => {
+                InitBlock::Idata((addr, valvec)) => {
                     line.push_str("idata");
                     regular_pair = Some((u32::from(*addr), valvec));
                 }
-                InitBlock::XDATA((addr, valvec)) => {
+                InitBlock::Xdata((addr, valvec)) => {
                     line.push_str("xdata");
                     regular_pair = Some((u32::from(*addr), valvec));
                 }
-                InitBlock::PDATA((addr, valvec)) => {
+                InitBlock::Pdata((addr, valvec)) => {
                     line.push_str("pdata");
                     regular_pair = Some((u32::from(*addr), valvec));
                 }
-                InitBlock::HDATA((addr, valvec)) => {
+                InitBlock::Hdata((addr, valvec)) => {
                     line.push_str("hdata");
                     regular_pair = Some((*addr, valvec));
                 }
@@ -140,7 +140,7 @@ impl InitData {
                 // and then of an array of values to write starting from there, but instead
                 // for each byte contains both the value and bit address to set (which also
                 // has to be formatted differently)
-                InitBlock::BIT(weirdvec) => {
+                InitBlock::Bit(weirdvec) => {
                     let mut iter = weirdvec
                         .iter()
                         // bit addresses start at 0x20 and are formatted as xx.y, where xx is the
@@ -208,7 +208,7 @@ mod tests {
             Ok((
                 &[][..],
                 InfoHeader {
-                    data_type: DataType::IDATA,
+                    data_type: DataType::Idata,
                     len: 7
                 }
             ))
@@ -221,7 +221,7 @@ mod tests {
             Ok((
                 &[][..],
                 InfoHeader {
-                    data_type: DataType::XDATA,
+                    data_type: DataType::Xdata,
                     len: 0x942
                 }
             ))
@@ -234,7 +234,7 @@ mod tests {
             Ok((
                 &[][..],
                 InfoHeader {
-                    data_type: DataType::HDATA,
+                    data_type: DataType::Hdata,
                     len: 0x1fff
                 }
             ))
@@ -250,9 +250,9 @@ mod tests {
             InitData::new(&hex::decode("47040348454C4C4F210AC14E015A0000").unwrap()),
             Ok(InitData {
                 blocks: vec![
-                    InitBlock::XDATA((0x403u16, vec![0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x21, 0x0a])),
-                    InitBlock::BIT(vec![(0, 0x4e)]),
-                    InitBlock::IDATA((0x5a, vec![0]))
+                    InitBlock::Xdata((0x403u16, vec![0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x21, 0x0a])),
+                    InitBlock::Bit(vec![(0, 0x4e)]),
+                    InitBlock::Idata((0x5a, vec![0]))
                 ]
             })
         )

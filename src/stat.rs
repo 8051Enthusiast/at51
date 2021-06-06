@@ -114,9 +114,7 @@ pub fn instr_align_count(
     }
     // there might be a byte near the end whose instruction is
     // longer than the file end, so we add that here
-    for _ in 0..(buf.len() - is_instr_start.len()) {
-        is_instr_start.push(false);
-    }
+    is_instr_start.resize(buf.len(), false);
     let mut ret = Vec::new();
     let mut prev_block = 0;
     let mut block_jumps = 0usize;
@@ -130,10 +128,10 @@ pub fn instr_align_count(
             prev_block = instr.pos / blocksize;
         }
         if let Some(target) = instr.get_jump_target() {
-            let is_abs = match instr.itype {
-                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL => true,
-                _ => false,
-            };
+            let is_abs = matches!(
+                instr.itype,
+                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL,
+            );
             // count number of valid aligned jumps
             if (abs || !is_abs) && (count_outside || target < is_instr_start.len()) {
                 block_jumps += 1;

@@ -67,7 +67,7 @@ pub fn read_libraries(
         }
         let modseg: SegmentCollection = parsed
             .unwrap()
-            .or_else(|err| Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)))?;
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
         modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
     }
     Ok((pubnames, refnames))
@@ -414,12 +414,8 @@ impl SegmentCollection {
                     for (sym, offset) in &self.segments[segindex].pubsyms {
                         if cslist[segpos + offset]
                             .iter()
-                            .find(|x| &x.name == sym)
-                            .is_none()
+                            .all(|x| &x.name != sym)
                         {
-                            // I feel bad about copying so much, but I'm lazy and not copying would
-                            // probably require adding another vector somewhere, of which there
-                            // are already more than enough
                             cslist[segpos + offset].push(Pubsymref {
                                 name: sym.clone(),
                                 refs: refvec.clone(),
