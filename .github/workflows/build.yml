@@ -58,10 +58,10 @@ jobs:
         if: matrix.os != 'windows-latest'
         with:
           name: 'at51-${{ matrix.os }}'
-          path: target/release/biodiff
+          path: target/release/at51
       - uses: actions/upload-artifact@v2
         if: matrix.os == 'windows-latest'
         with:
           name: 'at51-${{ matrix.os }}'
-          path: target/release/biodiff.exe
+          path: target/release/at51.exe
 
