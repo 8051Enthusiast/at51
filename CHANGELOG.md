@@ -1,3 +1,8 @@
+0.4.2 (2021-06-06)
+==================
+* Fix ambiguous parse for Keil library names that contain `LDIDATA` (was parsed as `LDI` `DATA`, should have been `LD` `IDATA`, the `DATA` space is actually not contained anywhere in the Keil libs)
+* Updated dependencies (newer rustfft version means that `base` is sped up, but it works almost instantly anyway)
+
 0.4.1 (2020-04-15)
 ==================
 * Fix debian not being able to compile because of new library features (fixes #3)

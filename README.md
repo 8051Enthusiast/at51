@@ -1,6 +1,5 @@
 # at51
 
-[![Build Status](https://travis-ci.org/8051Enthusiast/at51.svg?branch=master)](https://travis-ci.org/8051Enthusiast/at51)
 [![Crates.io](https://img.shields.io/crates/v/at51)](https://crates.io/crates/at51)
 
 A bunch of applications for the purpose of reverse engineering 8051 firmware.
@@ -200,7 +199,9 @@ Example config:
 ```
 
 ## Installation
-With cargo one can install it with `cargo install at51`.
+Downloadable releases should be on the release page of the github repository.
+
+Otherwise, with cargo one can install it with `cargo install at51`.
 
 Alternatively, to install from source, do
 ```
