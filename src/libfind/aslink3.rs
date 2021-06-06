@@ -14,7 +14,7 @@ use nom::{
         digit1, hex_digit1, line_ending, multispace0, none_of, oct_digit1, one_of, space0, space1,
     },
     combinator::{map, map_opt, map_res, opt, verify},
-    multi::{fold_many_m_n, many0, many1, separated_list0, separated_list1},
+    multi::{fold_many_m_n, many0, many1},
     sequence::{delimited, preceded, tuple},
     IResult,
 };
@@ -112,7 +112,7 @@ fn parse_byte_list(
 // parses as many bytes as possible
 // note: includes space at beginning
 fn parse_byte_many(format_tuple: (Radix, Endian, u8)) -> impl Fn(&str) -> IResult<&str, Vec<u8>> {
-    move |i| separated_list1(space1, parse_byte(format_tuple))(i)
+    move |i| many0(preceded(space1, parse_byte(format_tuple)))(i)
 }
 
 // parses a number that is split into multiple bytes
@@ -499,7 +499,7 @@ fn parse_reloc_frag(
     format_tuple: (Radix, Endian, u8),
 ) -> impl Fn(&str) -> IResult<&str, Vec<Aslink3RelFrag>> {
     move |i| {
-        separated_list0(
+        many0(preceded(
             space1,
             map(
                 tuple((
@@ -515,7 +515,7 @@ fn parse_reloc_frag(
                     symarea,
                 },
             ),
-        )(i)
+        ))(i)
     }
 }
 
