@@ -40,7 +40,7 @@ fn main() {
                 )
                 .arg(
                     Arg::with_name("cyclic")
-                        .help("jaj")
+                        .help("Shifts firmware cyclically inside 64k address space instead of moving it out of the space")
                         .short("c")
                         .long("cyclic")
                 )
@@ -273,7 +273,10 @@ fn main() {
             let filename = find_arg.value_of("file").unwrap();
             let contents = read_whole_file_by_name(filename);
             let check = !find_arg.is_present("no-check");
-            let mut libnames: Vec<_> = find_arg.values_of("libraries").unwrap_or_default().collect();
+            let mut libnames: Vec<_> = find_arg
+                .values_of("libraries")
+                .unwrap_or_default()
+                .collect();
             if libnames.is_empty() {
                 libnames = match &conf.libraries {
                     Some(libs) => libs.iter().map(|x| x.as_str()).collect(),
