@@ -130,7 +130,7 @@ pub fn instr_align_count(
         if let Some(target) = instr.get_jump_target() {
             let is_abs = matches!(
                 instr.itype,
-                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL,
+                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL
             );
             // count number of valid aligned jumps
             if (abs || !is_abs) && (count_outside || target < is_instr_start.len()) {
