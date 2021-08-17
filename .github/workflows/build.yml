@@ -41,7 +41,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: '{{ matrix.target }}'
+          target: '${{ matrix.target }}'
       - uses: actions/cache@v2
         with:
           path: |
@@ -50,11 +50,11 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: |
-          cargo test --target "{{ matrix.target }}" --release
-          cargo build --target "{{ matrix.target }}" --release
+          cargo test --target "${{ matrix.target }}" --release
+          cargo build --target "${{ matrix.target }}" --release
       - run: |
           cargo install cargo-strip
-          cargo strip --target "{{ matrix.target }}"
+          cargo strip --target "${{ matrix.target }}"
       - uses: actions/upload-artifact@v2
         if: matrix.os != 'windows-latest'
         with:
