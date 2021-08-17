@@ -300,6 +300,7 @@ fn main() {
                 });
                 println!("{}", json_str);
             } else {
+                println!("Library functions found for {}:", filename);
                 libfind::print_segrefs(&segrefs);
             }
         }

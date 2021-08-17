@@ -1,6 +1,7 @@
 1.0.0 (dev)
 ==================
 * Arbitrarily decide that this version is 1.0.0 because it has been stable enough
+* Add line to libfind output indicating the file (the way command line arguments are handled could lead to confusion)
 * Update dependencies
 
 0.4.2 (2021-06-06)
