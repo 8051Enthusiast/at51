@@ -103,13 +103,8 @@ pub fn instr_align_count(
     // record which bytes are the start of an instruction,
     // assuming a continuous instruction stream
     for instr in Instructeam::new(buf) {
-        if let InsType::RESRV = *instr.itype {
-            is_instr_start.push(false);
-        } else {
-            is_instr_start.push(true);
-        }
-        for _ in 1..instr.bytes.len() {
-            is_instr_start.push(false);
+        for i in 0..instr.bytes.len() {
+            is_instr_start.push(i == 0 && !matches!(*instr.itype, InsType::Resrv))
         }
     }
     // there might be a byte near the end whose instruction is
@@ -130,7 +125,7 @@ pub fn instr_align_count(
         if let Some(target) = instr.get_jump_target() {
             let is_abs = matches!(
                 instr.itype,
-                InsType::LJMP | InsType::LCALL | InsType::AJMP | InsType::ACALL
+                InsType::Ljmp | InsType::Lcall | InsType::Ajmp | InsType::Acall
             );
             // count number of valid aligned jumps
             if (abs || !is_abs) && (count_outside || target < is_instr_start.len()) {

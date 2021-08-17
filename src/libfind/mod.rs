@@ -68,7 +68,7 @@ pub fn read_libraries(
         let modseg: SegmentCollection = parsed
             .unwrap()
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
-        modseg.find_segments(&contents, &mut pubnames, &mut refnames, check);
+        modseg.find_segments(contents, &mut pubnames, &mut refnames, check);
     }
     Ok((pubnames, refnames))
 }

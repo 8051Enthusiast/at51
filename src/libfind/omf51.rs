@@ -588,7 +588,7 @@ fn content_mask_fixup_helper(
             2 => {
                 // for a extern reference, we search for the string and the offset
                 let name = match extlist.iter().find(|x| x.ext_id == fix.id).map(|x| &x.name) {
-                    Some(stst) => String::from_utf8_lossy(&stst),
+                    Some(stst) => String::from_utf8_lossy(stst),
                     None => return Err("Reference to non-existent name"),
                 };
                 super::CodeRef::new_pubref(name.clone().to_string(), fix.offset)

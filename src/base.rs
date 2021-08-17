@@ -49,12 +49,12 @@ pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
     // or similar opcode arguments as jump/call instructions
     for ins in Instructeam::new(buf) {
         match ins.itype {
-            InsType::LJMP | InsType::LCALL => {
+            InsType::Ljmp | InsType::Lcall => {
                 // mark the target addresses in the target address array
                 let target = ins.get_jump_target().unwrap();
                 ljmps[target] += 1;
             }
-            InsType::AJMP | InsType::ACALL => {
+            InsType::Ajmp | InsType::Acall => {
                 if acall {
                     // find the target address of the ajmp/acall instruction
                     let target = ins.get_jump_target().unwrap();
@@ -65,7 +65,7 @@ pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
                     ajmps[second_target] += 1;
                 }
             }
-            InsType::RET | InsType::RETI => {
+            InsType::Ret | InsType::Reti => {
                 // mark the address after the ret instruction
                 let ret_loc = (ins.pos + 1) & 0xffff | ins.pos & !0xffff;
                 rets[ret_loc] += 1;
