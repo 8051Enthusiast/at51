@@ -11,6 +11,18 @@ Currently, there are four applications:
 
 The output of each subcommand can also be used in other programs via JSON.
 
+## Installation
+Downloadable releases should be on the release page of the github repository.
+
+In order to compile manually, only cargo is needed, which can be installed with [rustup](https://rustup.rs/).
+With cargo one can install it with `cargo install at51`.
+
+Alternatively, to install from the repository source, do
+```
+git clone 'https://github.com/8051Enthusiast/at51.git'
+cargo install --path at51
+```
+
 ## stat
 This subprogram is useful for determining which regions of a file are probably 8051.
 If you want to determine the architecture of a file in general, a useful tool might be [cpu_rec](https://github.com/airbus-seclab/cpu_rec).
@@ -197,15 +209,3 @@ Example config:
 	"stat_mode": "AlignedJump"
 }
 ```
-
-## Installation
-Downloadable releases should be on the release page of the github repository.
-
-Otherwise, with cargo one can install it with `cargo install at51`.
-
-Alternatively, to install from source, do
-```
-git clone 'https://github.com/8051Enthusiast/at51.git'
-cargo install --path at51
-```
-
