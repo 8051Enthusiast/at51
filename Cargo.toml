@@ -17,7 +17,7 @@ rustfft = "6.0"       # base address finding
 nom = "6.1"           # parse libraries, init structure
 num-traits = "^0.2"	  # omf51 parsing
 lazy_static = "1.4.0" # for some default values
-ar = "0.8"            # for sdcc library, which is an bsd ar archive
+ar = "0.9"            # for sdcc library, which is an bsd ar archive
 bitflags = "1.2"	  # for sdcc library
 serde_json = "1.0"    # json output
 serde = { version = "1.0", features = ["derive"] }

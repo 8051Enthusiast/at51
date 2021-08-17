@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.43
+          toolchain: 1.48
       - uses: actions/cache@v2
         with:
           path: |

@@ -1,3 +1,8 @@
+1.0.0 (dev)
+==================
+* Arbitrarily decide that this version is 1.0.0 because it has been stable enough
+* Update dependencies
+
 0.4.2 (2021-06-06)
 ==================
 * Fix ambiguous parse for Keil library names that contain `LDIDATA` (was parsed as `LDI` `DATA`, should have been `LD` `IDATA`, the `DATA` space is actually not contained anywhere in the Keil libs)
