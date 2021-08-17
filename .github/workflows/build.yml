@@ -36,6 +36,7 @@ jobs:
             suffix: ''
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            suffix: '.exe'
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -56,13 +57,7 @@ jobs:
           cargo install cargo-strip
           cargo strip --target "${{ matrix.target }}"
       - uses: actions/upload-artifact@v2
-        if: matrix.os != 'windows-latest'
         with:
           name: 'at51-${{ matrix.os }}'
-          path: target/release/at51
-      - uses: actions/upload-artifact@v2
-        if: matrix.os == 'windows-latest'
-        with:
-          name: 'at51-${{ matrix.os }}'
-          path: target/release/at51.exe
+          path: 'target/${{ matrix.target }}/release/at51${{ matrix.suffix }}'
 
