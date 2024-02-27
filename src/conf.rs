@@ -2,32 +2,18 @@ use dirs::config_dir;
 use serde::Deserialize;
 use std::fs::File;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct Conf {
     pub libraries: Option<Vec<String>>,
     pub stat_mode: Option<StatMode>,
 }
 
-impl Default for Conf {
-    fn default() -> Conf {
-        Conf {
-            libraries: None,
-            stat_mode: None,
-        }
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub enum StatMode {
+    #[default]
     AlignedJump,
     SquareChi,
     KullbackLeibler,
-}
-
-impl Default for StatMode {
-    fn default() -> Self {
-        StatMode::AlignedJump
-    }
 }
 
 pub fn get_config() -> Conf {

@@ -400,7 +400,7 @@ impl SegmentCollection {
                         (RefType::SegId(id), Some(target)) => seglist[*id].contains(&target),
                         // for public references, just add the name to the rslist
                         (RefType::Pubname(name), Some(target)) => {
-                            if !rslist.entry(target).or_insert_with(Vec::new).contains(name) {
+                            if !rslist.entry(target).or_default().contains(name) {
                                 rslist.get_mut(&target).unwrap().push(name.clone());
                             }
                             refvec.push((target, name.clone()));
@@ -414,10 +414,7 @@ impl SegmentCollection {
                 invalid &= checkref;
                 if !invalid {
                     for (sym, offset) in &self.segments[segindex].pubsyms {
-                        if cslist[segpos + offset]
-                            .iter()
-                            .all(|x| &x.name != sym)
-                        {
+                        if cslist[segpos + offset].iter().all(|x| &x.name != sym) {
                             cslist[segpos + offset].push(Pubsymref {
                                 name: sym.clone(),
                                 refs: refvec.clone(),
@@ -518,12 +515,14 @@ impl Segment {
     }
 }
 
+pub type AddressFunction = Box<dyn Fn(&[u8], usize) -> usize>;
+
 /// A fixup, which is a memory location within a segment which references another memory location
 /// and is filled in later by the linker.
 pub struct Fixup {
     refloc: usize,
     size: usize,
-    addr_fun: Box<dyn Fn(&[u8], usize) -> usize>,
+    addr_fun: AddressFunction,
     code_ref: CodeRef,
 }
 
@@ -540,7 +539,7 @@ impl Fixup {
         refloc: usize,
         size: usize,
         // kept general in case of ASLINK implementation
-        addr_fun: Box<dyn Fn(&[u8], usize) -> usize>,
+        addr_fun: AddressFunction,
         code_ref: CodeRef,
     ) -> Self {
         Fixup {
@@ -634,10 +633,7 @@ mod tests {
         ref_hashmap.insert(0, vec![String::from("a"), String::from("b")]);
         assert_eq!(
             unify_refs(&mut vec![][..], &mut ref_hashmap, 0),
-            vec![
-                (&"a"[..], SymGoodness::RefOnly),
-                (&"b"[..], SymGoodness::RefOnly)
-            ]
+            vec![("a", SymGoodness::RefOnly), ("b", SymGoodness::RefOnly)]
         );
     }
     #[test]
@@ -660,8 +656,8 @@ mod tests {
                 0
             ),
             vec![
-                (&"ab"[..], SymGoodness::SymWithoutRef),
-                (&"c"[..], SymGoodness::SymWithoutRef)
+                ("ab", SymGoodness::SymWithoutRef),
+                ("c", SymGoodness::SymWithoutRef)
             ]
         );
     }
@@ -691,7 +687,7 @@ mod tests {
                 &mut ref_hashmap,
                 0
             ),
-            vec![(&"ab"[..], SymGoodness::GoodSym),]
+            vec![("ab", SymGoodness::GoodSym),]
         );
     }
     #[test]
@@ -728,14 +724,11 @@ mod tests {
     }
     #[test]
     fn check_at_location_end() {
-        assert_eq!(
-            check_at_location(
-                0x10,
-                &[0x10, 0x11, 0x12, 0x13],
-                &[(0x91, 0x7f), (0x12, 0xfe), (0x13, 0x13)],
-                0x11
-            ),
-            true
-        );
+        assert!(check_at_location(
+            0x10,
+            &[0x10, 0x11, 0x12, 0x13],
+            &[(0x91, 0x7f), (0x12, 0xfe), (0x13, 0x13)],
+            0x11
+        ));
     }
 }

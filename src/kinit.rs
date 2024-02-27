@@ -114,27 +114,26 @@ impl InitData {
     /// Prints the information of the init structure to stdout.
     pub fn print(&self) {
         for block in &self.blocks {
-            let regular_pair;
             let mut line = String::from("");
-            match block {
+            let regular_pair = match block {
                 // for IDATA, XDATA, PDATA and HDATA, we
                 // pretty much do the same, but we have to convert
                 // the addresses to u32 to unify the printing
                 InitBlock::Idata((addr, valvec)) => {
                     line.push_str("idata");
-                    regular_pair = Some((u32::from(*addr), valvec));
+                    Some((u32::from(*addr), valvec))
                 }
                 InitBlock::Xdata((addr, valvec)) => {
                     line.push_str("xdata");
-                    regular_pair = Some((u32::from(*addr), valvec));
+                    Some((u32::from(*addr), valvec))
                 }
                 InitBlock::Pdata((addr, valvec)) => {
                     line.push_str("pdata");
-                    regular_pair = Some((u32::from(*addr), valvec));
+                    Some((u32::from(*addr), valvec))
                 }
                 InitBlock::Hdata((addr, valvec)) => {
                     line.push_str("hdata");
-                    regular_pair = Some((*addr, valvec));
+                    Some((*addr, valvec))
                 }
                 // the BIT case is a bit different, since it doesn't consist of a start address
                 // and then of an array of values to write starting from there, but instead
@@ -164,7 +163,7 @@ impl InitData {
                     );
                     continue;
                 }
-            }
+            };
             match regular_pair {
                 Some((addr, valvec)) => {
                     if valvec.is_empty() {
