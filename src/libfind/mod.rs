@@ -382,6 +382,16 @@ impl SegmentCollection {
         }
         for (segindex, x) in seglist.iter().enumerate() {
             for segpos in x {
+                // short segments can create a lot of noise and we don't really care for them
+                // anyway
+                let active_bytes: usize = self.segments[segindex]
+                    .content_mask
+                    .iter()
+                    .map(|(_, mask)| usize::from(*mask != 0))
+                    .sum();
+                if active_bytes < 4 {
+                    continue;
+                }
                 let mut invalid = false;
                 let mut refvec: Vec<(usize, String)> = Vec::new();
                 for fix in &self.segments[segindex].fixup {
@@ -402,14 +412,6 @@ impl SegmentCollection {
                     }
                 }
                 invalid &= checkref;
-                // short segments can create a lot of noise and we don't really care for them
-                // anyway
-                let active_bytes: usize = self.segments[segindex]
-                    .content_mask
-                    .iter()
-                    .map(|(_, mask)| usize::from(*mask != 0))
-                    .sum();
-                invalid |= active_bytes < 4;
                 if !invalid {
                     for (sym, offset) in &self.segments[segindex].pubsyms {
                         if cslist[segpos + offset]
