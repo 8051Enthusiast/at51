@@ -433,7 +433,6 @@ fn data_debug_section(i: &[u8]) -> IResult<&[u8], Vec<(Content, Vec<Fixup>)>> {
 
 #[derive(Debug)]
 struct Module {
-    name: Vec<u8>,
     segdefs: Vec<SegmentDef>,
     extdefs: Vec<ExternDef>,
     pubdefs: Vec<PublicDef>,
@@ -462,7 +461,6 @@ fn module(i: &[u8]) -> IResult<&[u8], Module> {
             }
             assert_eq!(beg.0, end.0);
             Module {
-                name: beg.0,
                 segdefs,
                 extdefs,
                 pubdefs,
