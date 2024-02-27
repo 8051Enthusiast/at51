@@ -99,7 +99,7 @@ fn parse_byte_list(
                 (number_of_bytes - 1) as usize,
                 (number_of_bytes - 1) as usize,
                 preceded(space1, parse_byte(format_tuple)),
-                vec![n],
+                || vec![n],
                 |mut m, k| {
                     m.push(k);
                     m
@@ -260,6 +260,7 @@ fn endian_to_number(endian: Endian, len: u8, buf: &[u8]) -> usize {
 // the mode bitflags of the relocations carry information on how the relocation is applied to the
 // address
 bitflags! {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     struct Mode: u16 {
         const BYTE = 1;           // relocation is a byte (default: word)
         const SYMBOL = 1<<1;      // references symbol (default: area)

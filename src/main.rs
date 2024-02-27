@@ -5,202 +5,132 @@ pub mod kinit;
 pub mod libfind;
 pub mod stat;
 
-use clap::{App, Arg, ArgGroup, SubCommand};
+use clap::{arg, Parser, Subcommand};
 use conf::StatMode;
 use std::fs::File;
 use std::io::Read;
-use std::process;
+use std::process::{self};
+
+#[derive(Parser, Debug)]
+struct Base {
+    /// Use offsets from ajmp/acall [default: no]
+    #[arg(short, long)]
+    acall: bool,
+    /// Output JSON (warning: outputs array of length 65536)
+    #[arg(short, long)]
+    json: bool,
+    /// Output the n most fitting indexes
+    #[arg(short, long, default_value_t = 3)]
+    index_count: usize,
+    /// Shifts firmware cyclically inside 64k address space instead of moving it out of the space
+    #[arg(short, long)]
+    cyclic: bool,
+    /// Dump the likeliness values of every address (warning: long)
+    #[arg(short, long)]
+    dump: bool,
+    /// File to find base address of
+    #[arg(index = 1)]
+    file: Vec<String>,
+}
+
+#[derive(Parser, Debug)]
+struct Libfind {
+    /// Output JSON
+    #[arg(short, long)]
+    json: bool,
+    /// Do not check if direct segment references are valid (more noise)
+    #[arg(short, long)]
+    no_check: bool,
+    /// File to find functions in
+    #[arg(index = 1)]
+    file: String,
+    /// OMF51 Libraries to take definitions from
+    #[arg(index = 2)]
+    libraries: Vec<String>,
+}
+
+#[derive(Parser, Debug)]
+struct Stat {
+    /// Blocksize of the square-chi test
+    #[arg(short, long, default_value_t = 512)]
+    blocksize: usize,
+    /// Use a file to derive the frequencies
+    #[arg(short, long)]
+    corpus: Option<String>,
+    /// Output JSON
+    #[arg(short, long)]
+    json: bool,
+    /// Use Kullback-Leibler divergence
+    #[arg(short, long)]
+    kullback_leibler: bool,
+    /// Use chi-squared error
+    #[arg(short, long)]
+    chi_squared: bool,
+    /// Use percentage of non-aligned jumps (default)
+    #[arg(short, long)]
+    aligned_jump: bool,
+    /// When using aligned-jump, also include absolute jumps
+    #[arg(short, long)]
+    count_absolute: bool,
+    /// When using aligned-jump, also include jumps to outside of firmware as misses
+    #[arg(short, long)]
+    count_outside: bool,
+    /// Also outputs the number of datapoints used in each block
+    #[arg(short, long)]
+    number_data: bool,
+    /// File to get 8051 statistics from
+    #[arg(index = 1)]
+    file: String,
+}
+
+#[derive(Parser, Debug)]
+struct Kinit {
+    /// Output JSON
+    #[arg(short, long)]
+    json: bool,
+    /// Location of Keil init data structure
+    #[arg(short, long, default_value_t = 0)]
+    offset: usize,
+    /// File to find Keil Init structure in
+    #[arg(index = 1)]
+    file: String,
+}
+
+#[derive(Subcommand, Debug)]
+enum Cmd {
+    /// Finds the base address of a firmware file
+    Base(Base),
+    /// Finds occurences of standard library functions in file
+    Libfind(Libfind),
+    /// Shows statistical information about 8051 instruction frequency
+    Stat(Stat),
+    /// Shows the initialized variables of the Keil init segment
+    Kinit(Kinit),
+}
+
+#[derive(Parser, Debug)]
+struct Cli {
+    /// Applications for reverse engineering architecture 8051 firmware
+    #[command(subcommand)]
+    subcommand: Cmd,
+}
 
 fn main() {
-    let cliargs = App::new("at51")
-        .version("1.0.0")
-        .about("Applications for reverse engineering architecture 8051 firmware")
-        .subcommand(
-            SubCommand::with_name("base")
-                .about("Finds the base address of a firmware file")
-                .arg(
-                    Arg::with_name("acall")
-                        .help("Use offsets from ajmp/acall [default: no]")
-                        .short("a")
-                        .long("acall"),
-                )
-                .arg(
-                    Arg::with_name("json")
-                        .help("Output JSON (warning: outputs array of length 65536)")
-                        .short("j")
-                        .long("json"),
-                )
-                .arg(
-                    Arg::with_name("index-count")
-                        .help("Output the n most fitting indexes")
-                        .short("n")
-                        .long("index-count")
-                        .takes_value(true)
-                        .default_value("3"),
-                )
-                .arg(
-                    Arg::with_name("cyclic")
-                        .help("Shifts firmware cyclically inside 64k address space instead of moving it out of the space")
-                        .short("c")
-                        .long("cyclic")
-                )
-                .arg(
-                    Arg::with_name("dump")
-                        .help("Dump the likeliness values of every address (warning: long)")
-                        .short("d")
-                        .long("dump")
-                )
-                .arg(
-                    Arg::with_name("file")
-                        .help("File to find base address of")
-                        .required(true)
-                        .multiple(true)
-                        .min_values(1)
-                        .max_values(32)
-                        .index(1),
-                )
-        )
-        .subcommand(
-            SubCommand::with_name("libfind")
-                .about("Finds occurences of standard library functions in file")
-                .arg(
-                    Arg::with_name("json")
-                        .help("Output JSON")
-                        .short("j")
-                        .long("json"),
-                )
-                .arg(
-                    Arg::with_name("no-check")
-                        .help("Do not check if direct segment references are valid (more noise)")
-                        .short("n")
-                        .long("no-check"),
-                )
-                .arg(
-                    Arg::with_name("file")
-                        .help("File to find functions in")
-                        .required(true)
-                        .index(1),
-                )
-                .arg(
-                    Arg::with_name("libraries")
-                        .help("OMF51 Libraries to take definitions from")
-                        .multiple(true)
-                        .min_values(0)
-                        .index(2),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("stat")
-                .about("Shows statistical information about 8051 instruction frequency")
-                .arg(
-                    Arg::with_name("blocksize")
-                        .help("Blocksize of the square-chi test")
-                        .short("b")
-                        .long("blocksize")
-                        .takes_value(true)
-                        .default_value("512"),
-                )
-                .arg(
-                    Arg::with_name("corpus")
-                        .help("Use a file to derive the frequencies")
-                        .short("c")
-                        .long("corpus")
-                        .takes_value(true),
-                )
-                .arg(
-                    Arg::with_name("json")
-                        .help("Output JSON")
-                        .short("j")
-                        .long("json"),
-                )
-                .arg(
-                    Arg::with_name("kullback-leibler")
-                        .help("Use Kullback-Leibler divergence (default)")
-                        .short("k")
-                        .long("kullback-leibler"),
-                )
-                .arg(
-                    Arg::with_name("chi-squared")
-                        .help("Use chi-squared error")
-                        .short("x")
-                        .long("chi-squared"),
-                )
-                .arg(
-                    Arg::with_name("aligned-jump")
-                        .help("Use percentage of non-aligned jumps")
-                        .short("a")
-                        .long("aligned-jump")
-                )
-                .arg(
-                    Arg::with_name("count-absolute")
-                        .help("When using aligned-jump, also include absolute jumps")
-                        .short("A")
-                        .long("count-absolute")
-                )
-                .arg(
-                    Arg::with_name("count-outside")
-                        .help("When using aligned-jump, also include jumps to outside of firmware as misses")
-                        .short("O")
-                        .long("count-outside")
-                )
-                .arg(
-                    Arg::with_name("number-data")
-                        .help("Also outputs the number of datapoints used in each block")
-                        .short("n")
-                        .long("number-data")
-                )
-                .arg(
-                    Arg::with_name("file")
-                        .help("File to get 8051 statistics from")
-                        .required(true)
-                        .index(1),
-                )
-            .group(ArgGroup::with_name("mode")
-                   .args(&["kullback-leibler", "chi-squared", "aligned-jump"]))
-        )
-        .subcommand(
-            SubCommand::with_name("kinit")
-                .about("Shows the initialized variables of the Keil init segment")
-                .arg(
-                    Arg::with_name("json")
-                        .help("Output JSON")
-                        .short("j")
-                        .long("json"),
-                )
-                .arg(
-                    Arg::with_name("offset")
-                        .help("Location of Keil init data structure")
-                        .short("o")
-                        .long("offset")
-                        .takes_value(true)
-                        .default_value("0"),
-                )
-                .arg(
-                    Arg::with_name("file")
-                        .help("File to find Keil Init structure in")
-                        .required(true)
-                        .index(1),
-                ),
-        )
-        .get_matches();
+    let cliargs = Cli::parse();
     let conf = conf::get_config();
-    match cliargs.subcommand() {
-        // base handling
-        ("base", Some(base_arg)) => {
+    match cliargs.subcommand {
+        Cmd::Base(Base {
+            acall,
+            json,
+            index_count,
+            cyclic,
+            dump,
+            file,
+        }) => {
             // list of files to find out alignment of
-            let filenames = base_arg.values_of("file").unwrap();
-            let nfiles = filenames.len();
+            let nfiles = file.len();
             let mut mean: Vec<f64> = vec![1.0; 0x20000];
-            let acall = base_arg.is_present("acall");
-            let num: usize = base_arg
-                .value_of("index-count")
-                .unwrap()
-                .parse()
-                .unwrap_or_else(|err| {
-                    eprintln!("Could not read index count: {}", err);
-                    process::exit(2);
-                });
-            for name in filenames {
+            for name in file.iter() {
                 let f = File::open(name).unwrap_or_else(|err| {
                     eprintln!("Could not open file '{}': {}", name, err);
                     process::exit(2);
@@ -212,13 +142,13 @@ fn main() {
                     eprintln!("Could not read file '{}': {}", name, err);
                     process::exit(2);
                 });
-                let match_array = base::find_base(&buf, acall, base_arg.is_present("cyclic"));
+                let match_array = base::find_base(&buf, acall, cyclic);
                 mean = mean
                     .iter()
                     .zip(match_array.iter())
                     .map(|(x, y)| x + y)
                     .collect();
-                if nfiles > 1 && !base_arg.is_present("json") && !base_arg.is_present("dump") {
+                if nfiles > 1 && !json && !dump {
                     let (best_index, best_value) = base::maxidx(&match_array, 1)[0];
                     let idx: isize = if best_index >= 0x10000 {
                         best_index as isize - 2 * 0x10000
@@ -228,11 +158,8 @@ fn main() {
                     println!("Best index of '{}': {:#04x} with {}", name, idx, best_value);
                 }
             }
-            mean = mean
-                .iter()
-                .map(|x| x / base_arg.occurrences_of("file") as f64)
-                .collect();
-            match (base_arg.is_present("dump"), base_arg.is_present("json")) {
+            mean = mean.iter().map(|x| x / file.len() as f64).collect();
+            match (dump, json) {
                 (true, true) => {
                     let json_str = serde_json::to_string(&mean).unwrap_or_else(|err| {
                         eprintln!("Could not create json: {}", err);
@@ -246,8 +173,8 @@ fn main() {
                     }
                 }
                 (false, true) => {
-                    let json_str =
-                        serde_json::to_string(&base::maxidx(&mean, num)).unwrap_or_else(|err| {
+                    let json_str = serde_json::to_string(&base::maxidx(&mean, index_count))
+                        .unwrap_or_else(|err| {
                             eprintln!("Could not create json: {}", err);
                             process::exit(2);
                         });
@@ -255,7 +182,7 @@ fn main() {
                 }
                 (false, false) => {
                     println!("Index by likeliness:");
-                    for (i, (index, value)) in base::maxidx(&mean, num).iter().enumerate() {
+                    for (i, (index, value)) in base::maxidx(&mean, index_count).iter().enumerate() {
                         let nidx: isize = if *index >= 0x10000 {
                             *index as isize - 2 * 0x10000
                         } else {
@@ -268,68 +195,65 @@ fn main() {
             }
         }
 
-        // libfind handling
-        ("libfind", Some(find_arg)) => {
-            let filename = find_arg.value_of("file").unwrap();
-            let contents = read_whole_file_by_name(filename);
-            let check = !find_arg.is_present("no-check");
-            let mut libnames: Vec<_> = find_arg
-                .values_of("libraries")
-                .unwrap_or_default()
-                .collect();
-            if libnames.is_empty() {
-                libnames = match &conf.libraries {
-                    Some(libs) => libs.iter().map(|x| x.as_str()).collect(),
-                    None => Vec::new(),
-                }
+        Cmd::Libfind(Libfind {
+            json,
+            no_check,
+            file,
+            mut libraries,
+        }) => {
+            let contents = read_whole_file_by_name(&file);
+            let check = !no_check;
+            if libraries.is_empty() {
+                libraries = conf.libraries.clone().unwrap_or_default();
             }
-            if libnames.is_empty() {
+            if libraries.is_empty() {
                 eprintln!("No libraries given and none in config");
                 process::exit(2);
             }
-            let (mut pubnames, mut refnames) = libfind::read_libraries(&libnames, &contents, check)
-                .unwrap_or_else(|err| {
+            let (mut pubnames, mut refnames) =
+                libfind::read_libraries(&libraries, &contents, check).unwrap_or_else(|err| {
                     eprintln!("Could not process library files: {}", err);
                     process::exit(2);
                 });
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
-            if find_arg.is_present("json") {
+            if json {
                 let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {
                     eprintln!("Could not print json: {}", err);
                     process::exit(2);
                 });
                 println!("{}", json_str);
             } else {
-                println!("Library functions found for {}:", filename);
+                println!("Library functions found for {}:", file);
                 libfind::print_segrefs(&segrefs);
             }
         }
 
-        // stat handling
-        ("stat", Some(stat_arg)) => {
-            let filename = stat_arg.value_of("file").unwrap();
-            let contents = read_whole_file_by_name(filename);
-            let mode = if stat_arg.is_present("chi-squared") {
+        Cmd::Stat(Stat {
+            blocksize,
+            corpus,
+            json,
+            kullback_leibler,
+            chi_squared,
+            aligned_jump,
+            count_absolute,
+            count_outside,
+            number_data,
+            file,
+        }) => {
+            let contents = read_whole_file_by_name(&file);
+            let mode = if chi_squared {
                 StatMode::SquareChi
-            } else if stat_arg.is_present("kullback-leibler") {
+            } else if kullback_leibler {
                 StatMode::KullbackLeibler
-            } else if stat_arg.is_present("aligned-jump") {
+            } else if aligned_jump {
                 StatMode::AlignedJump
             } else {
                 conf.stat_mode.unwrap_or_default()
             };
-            let blocksize: usize = stat_arg
-                .value_of("blocksize")
-                .unwrap()
-                .parse()
-                .unwrap_or_else(|err| {
-                    eprintln!("Could not read blocksize: {}", err);
-                    process::exit(2);
-                });
-            let corpus = stat_arg.value_of("corpus").map(|f| {
+            let corpus = corpus.map(|f| {
                 stat::FreqInfo::new(
                     &[32, 32, 32, 32, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8, 8, 8],
-                    &read_whole_file_by_name(f),
+                    &read_whole_file_by_name(&f),
                 )
                 .unwrap_or_else(|err| {
                     eprintln!("Error deriving from Corpus: {}", err);
@@ -346,16 +270,12 @@ fn main() {
                     stat::kullback_leibler,
                     corpus.as_ref(),
                 ),
-                StatMode::AlignedJump => stat::instr_align_count(
-                    &contents,
-                    blocksize,
-                    stat_arg.is_present("count-absolute"),
-                    stat_arg.is_present("count-outside"),
-                ),
+                StatMode::AlignedJump => {
+                    stat::instr_align_count(&contents, blocksize, count_absolute, count_outside)
+                }
             };
-            let is_n = stat_arg.is_present("number-data");
-            if stat_arg.is_present("json") {
-                let json_str = if is_n {
+            if json {
+                let json_str = if number_data {
                     serde_json::to_string(&blocks)
                 } else {
                     serde_json::to_string(&blocks.iter().map(|(x, _)| x).collect::<Vec<_>>())
@@ -367,7 +287,7 @@ fn main() {
                 println!("{}", json_str);
             } else {
                 for (i, (x, n)) in blocks.iter().enumerate() {
-                    if is_n {
+                    if number_data {
                         println!("{:#04x}: {} {}", i * blocksize, x, n)
                     } else {
                         println!("{:#04x}: {}", i * blocksize, x)
@@ -376,23 +296,13 @@ fn main() {
             }
         }
 
-        // kinit handling
-        ("kinit", Some(kinit_arg)) => {
-            let filename = kinit_arg.value_of("file").unwrap();
-            let contents = read_whole_file_by_name(filename);
-            let offset: usize = kinit_arg
-                .value_of("offset")
-                .unwrap()
-                .parse()
-                .unwrap_or_else(|err| {
-                    eprintln!("Could not read offset: {}", err);
-                    process::exit(2);
-                });
+        Cmd::Kinit(Kinit { json, offset, file }) => {
+            let contents = read_whole_file_by_name(&file);
             let init_data = kinit::InitData::new(&contents[offset..]).unwrap_or_else(|_| {
                 eprintln!("Error parsing data structure");
                 process::exit(2);
             });
-            if kinit_arg.is_present("json") {
+            if json {
                 let json_str = serde_json::to_string(&init_data).unwrap_or_else(|err| {
                     eprintln!("Could not print json: {}", err);
                     process::exit(2);
@@ -401,10 +311,6 @@ fn main() {
             } else {
                 init_data.print();
             }
-        }
-        _ => {
-            println!("{}", cliargs.usage());
-            process::exit(1);
         }
     }
 }

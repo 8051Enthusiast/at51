@@ -12,16 +12,16 @@ repository = "https://github.com/8051Enthusiast/at51"
 
 
 [dependencies]
-clap = "2.33"         # cl arg parsing
-rustfft = "6.0"       # base address finding
-nom = "6.1"           # parse libraries, init structure
+clap = { version = "4.5", features = ["derive"] }# cl arg parsing
+rustfft = "6.2"       # base address finding
+nom = "7.1"           # parse libraries, init structure
 num-traits = "^0.2"	  # omf51 parsing
 lazy_static = "1.4.0" # for some default values
 ar = "0.9"            # for sdcc library, which is an bsd ar archive
-bitflags = "1.2"	  # for sdcc library
+bitflags = "2.4"	  # for sdcc library
 serde_json = "1.0"    # json output
 serde = { version = "1.0", features = ["derive"] }
-dirs = "3.0"
+dirs = "5.0"
 
 [dev-dependencies]
 hex = "~0.4.0"		# used for omf51 tests

@@ -30,7 +30,7 @@ pub type RefHashMap<S> = HashMap<usize, Vec<String>, S>;
 /// * `contents`: Contents of the file to find segments of
 /// * `check`: Whether to check if local references are valid
 pub fn read_libraries(
-    libpath: &[&str],
+    libpath: &[String],
     contents: &[u8],
     check: bool,
 ) -> Result<(Vec<Vec<Pubsymref>>, RefHashMap<RandomState>)> {
