@@ -259,9 +259,14 @@ pub fn print_segrefs(segrefs: &[Segref]) {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize)]
 pub enum SymGoodness {
-    RefOnly = 0,       // symbol is only a reference made by another segment
-    SymWithoutRef = 1, // symbol content is found in bytes, but references don't check out
-    GoodSym = 2,       // symbol content appears in bytes and references also
+    /// symbol is only a reference made by another segment
+    RefOnly = 0,
+    /// symbol content is found in bytes, but references don't check out
+    SymWithoutRef = 1,
+    /// symbol content appears in bytes and references also
+    GoodSym = 2,
+    /// symbol content appears in bytes and references also, and is referenced by other segments
+    ReferencedGoodSym = 3,
 }
 
 /// Merges two lists and gives a boolean value for each if the item is only present in the second list.
@@ -284,12 +289,9 @@ fn unify_refs<'a>(
     let mut bidx = 0;
     // if both indexes are at the end of their lists, we are finished
     while aidx < a.len() || bidx < b.len() {
-        // add an item from `a` if there are still items left
-        // if there are no items in b left, we don't have to compare them,
-        // otherwise we compare them so that we don't just add all items from
-        // a first
         if aidx < a.len() && (bidx >= b.len() || a[aidx].name <= b[bidx].0) {
-            if !a[aidx].valid {
+            let is_reffed = Some(&a[aidx].name) == b.get(bidx).map(|x| &x.0);
+            if !is_reffed && !a[aidx].valid {
                 aidx += 1;
                 continue;
             }
@@ -306,7 +308,11 @@ fn unify_refs<'a>(
                 }
             }
             let goodness = if validrefs {
-                SymGoodness::GoodSym
+                if is_reffed {
+                    SymGoodness::ReferencedGoodSym
+                } else {
+                    SymGoodness::GoodSym
+                }
             } else {
                 SymGoodness::SymWithoutRef
             };
@@ -699,8 +705,7 @@ mod tests {
             0,
             vec![
                 (String::from("ba"), RefKind::Valid),
-                (String::from("c"), RefKind::Valid),
-                (String::from("ab"), RefKind::Invalid),
+                (String::from("c"), RefKind::Invalid),
             ],
         );
         assert_eq!(
@@ -719,13 +724,43 @@ mod tests {
                     Pubsymref {
                         name: String::from("ab"),
                         valid: true,
-                        refs: vec![(0, String::from("ab"))]
+                        refs: vec![(0, String::from("c"))]
                     }
                 ]][..],
                 &mut ref_hashmap,
                 0
             ),
             vec![("ab", SymGoodness::GoodSym),]
+        );
+    }
+    #[test]
+    fn unify_refs_4() {
+        let mut ref_hashmap = HashMap::new();
+        ref_hashmap.insert(
+            0,
+            vec![
+                (String::from("ab"), RefKind::Valid),
+                (String::from("c"), RefKind::Valid),
+            ],
+        );
+        assert_eq!(
+            unify_refs(
+                &mut vec![vec![
+                    Pubsymref {
+                        name: String::from("b"),
+                        valid: true,
+                        refs: vec![]
+                    },
+                    Pubsymref {
+                        name: String::from("ab"),
+                        valid: true,
+                        refs: vec![]
+                    },
+                ]][..],
+                &mut ref_hashmap,
+                0
+            ),
+            vec![("ab", SymGoodness::ReferencedGoodSym),]
         );
     }
     #[test]
