@@ -2,7 +2,6 @@
 //! the public symbols in that file.
 pub mod aslink3;
 pub mod omf51;
-use lazy_static::lazy_static;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -11,15 +10,9 @@ use nom::{
     IResult,
 };
 use serde::Serialize;
-use std::{
-    collections::{hash_map::RandomState, HashMap},
-    convert::TryInto,
-    fs,
-    hash::BuildHasher,
-    io::Result,
-};
+use std::{collections::HashMap, convert::TryInto, fs, io::Result};
 
-pub type RefHashMap<S> = HashMap<usize, Vec<String>, S>;
+pub type RefHashMap = HashMap<usize, Vec<(String, RefKind)>>;
 /// Reads a list of libraries, parses them and calls the find_segments function on each of them for
 /// the function, returning the cslist and rslist arrays.
 /// For files in the libpath array, all available parsers are tried and if it does not work, the
@@ -35,7 +28,7 @@ pub fn read_libraries(
     contents: &[u8],
     check: bool,
     min_fn_length: usize,
-) -> Result<(Vec<Vec<Pubsymref>>, RefHashMap<RandomState>)> {
+) -> Result<(Vec<Vec<Pubsymref>>, RefHashMap)> {
     let mut libnames: Vec<std::path::PathBuf> = Vec::new();
     for path in libpath {
         let path_meta = fs::metadata(path)?;
@@ -75,6 +68,12 @@ pub fn read_libraries(
     Ok((pubnames, refnames))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RefKind {
+    Invalid,
+    Valid,
+}
+
 /// A single instance of a public symbol found in a firmware image at an address
 #[derive(Serialize)]
 pub struct Segref {
@@ -91,10 +90,7 @@ pub struct Segref {
 /// * `cslist`: List of public symbols of segments found in the file at each address and the
 /// symbols it references
 /// * `rslist`: HashMap of public symbols referenced by segments by address
-pub fn process_segrefs<S: BuildHasher>(
-    cslist: &mut [Vec<Pubsymref>],
-    rslist: &mut RefHashMap<S>,
-) -> Vec<Segref> {
+pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut RefHashMap) -> Vec<Segref> {
     // first get all symbols which lay in the file
     let mut segrefs: Vec<Segref> = Vec::new();
     for i in 0..cslist.len() {
@@ -111,11 +107,11 @@ pub fn process_segrefs<S: BuildHasher>(
     // symbols outside the file can only be by reference and are stored in the hashmap
     let mut leftover_refs: Vec<_> = rslist.iter().filter(|(i, _)| **i >= cslist.len()).collect();
     leftover_refs.sort_by_key(|(i, _)| **i);
-    for (i, arr) in leftover_refs {
-        for s in arr {
+    for (i, arr) in leftover_refs.into_iter() {
+        for s in arr.iter().filter(|s| s.1 == RefKind::Valid) {
             segrefs.push(Segref {
                 location: *i,
-                name: s.clone(),
+                name: s.0.clone(),
                 goodness: SymGoodness::RefOnly,
                 description: None,
             });
@@ -234,6 +230,7 @@ fn parse_description(i: &str) -> IResult<&str, (&str, Option<&str>, &str, Operat
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct Pubsymref {
     pub name: String,
+    valid: bool,
     refs: Vec<(usize, String)>,
 }
 
@@ -268,9 +265,9 @@ pub enum SymGoodness {
 }
 
 /// Merges two lists and gives a boolean value for each if the item is only present in the second list.
-fn unify_refs<'a, S: BuildHasher>(
+fn unify_refs<'a>(
     cslist: &'a mut [Vec<Pubsymref>],
-    rslist: &'a mut RefHashMap<S>,
+    rslist: &'a mut RefHashMap,
     index: usize,
 ) -> Vec<(&'a str, SymGoodness)> {
     let mut symarray: Vec<(&str, SymGoodness)> = Vec::new();
@@ -281,12 +278,8 @@ fn unify_refs<'a, S: BuildHasher>(
     if let Some(arr) = rslist.get_mut(&index) {
         arr.sort();
     }
-    lazy_static! {
-        static ref EMPTY_A: Vec<Pubsymref> = Vec::new();
-        static ref EMPTY_B: Vec<String> = Vec::new();
-    }
-    let a = cslist.get(index).unwrap_or(&EMPTY_A);
-    let b = rslist.get(&index).unwrap_or(&EMPTY_B);
+    let a = cslist.get(index).map(|x| x.as_slice()).unwrap_or_default();
+    let b = rslist.get(&index).map(|x| x.as_slice()).unwrap_or_default();
     let mut aidx = 0;
     let mut bidx = 0;
     // if both indexes are at the end of their lists, we are finished
@@ -295,7 +288,11 @@ fn unify_refs<'a, S: BuildHasher>(
         // if there are no items in b left, we don't have to compare them,
         // otherwise we compare them so that we don't just add all items from
         // a first
-        if aidx < a.len() && (bidx >= b.len() || a[aidx].name <= b[bidx]) {
+        if aidx < a.len() && (bidx >= b.len() || a[aidx].name <= b[bidx].0) {
+            if !a[aidx].valid {
+                aidx += 1;
+                continue;
+            }
             let mut validrefs = true;
             for (idx, refname) in &a[aidx].refs {
                 if let Some(subarr) = cslist.get(*idx) {
@@ -308,19 +305,20 @@ fn unify_refs<'a, S: BuildHasher>(
                     break;
                 }
             }
-            if validrefs {
-                symarray.push((&a[aidx].name, SymGoodness::GoodSym));
+            let goodness = if validrefs {
+                SymGoodness::GoodSym
             } else {
-                symarray.push((&a[aidx].name, SymGoodness::SymWithoutRef));
-            }
+                SymGoodness::SymWithoutRef
+            };
+            symarray.push((&a[aidx].name, goodness));
             aidx += 1;
-        }
-        // the same case, but for b
-        else if bidx < b.len() && (aidx >= a.len() || a[aidx].name >= b[bidx]) {
-            symarray.push((&b[bidx], SymGoodness::RefOnly));
+        } else if bidx < b.len() && (aidx >= a.len() || a[aidx].name >= b[bidx].0) {
+            if b[bidx].1 == RefKind::Valid {
+                symarray.push((&b[bidx].0, SymGoodness::RefOnly));
+            }
             bidx += 1;
         } else {
-            panic!("Internal Error, this should not happen");
+            unreachable!()
         };
     }
     // only use symbols with maximum goodness
@@ -359,11 +357,11 @@ impl SegmentCollection {
     /// * `checkref`: whether to check if local direct segment refernces are checked for validity
     /// (reduces noise)
     /// * `min_fn_length`: minimum length of a matched function
-    pub fn find_segments<S: BuildHasher>(
+    pub fn find_segments(
         self,
         buf: &[u8],
         cslist: &mut [Vec<Pubsymref>],
-        rslist: &mut RefHashMap<S>,
+        rslist: &mut RefHashMap,
         checkref: bool,
         min_fn_length: usize,
     ) {
@@ -393,9 +391,12 @@ impl SegmentCollection {
                     .iter()
                     .map(|(_, mask)| usize::from(*mask != 0))
                     .sum();
-                if active_bytes < min_fn_length {
-                    continue;
-                }
+                let is_active = active_bytes >= min_fn_length;
+                let kind = if is_active {
+                    RefKind::Valid
+                } else {
+                    RefKind::Invalid
+                };
                 let mut invalid = false;
                 let mut refvec: Vec<(usize, String)> = Vec::new();
                 for fix in &segment.fixup {
@@ -404,8 +405,14 @@ impl SegmentCollection {
                         (RefType::SegId(id), Some(target)) => seglist[*id].contains(&target),
                         // for public references, just add the name to the rslist
                         (RefType::Pubname(name), Some(target)) => {
-                            if !rslist.entry(target).or_default().contains(name) {
-                                rslist.get_mut(&target).unwrap().push(name.clone());
+                            let entry = rslist.entry(target).or_default();
+                            match entry.iter_mut().find(|x| &x.0 == name) {
+                                Some((_, ref_kind)) => {
+                                    *ref_kind = (*ref_kind).max(kind);
+                                }
+                                None => {
+                                    entry.push((name.clone(), kind));
+                                }
                             }
                             refvec.push((target, name.clone()));
                             true
@@ -421,6 +428,7 @@ impl SegmentCollection {
                         if cslist[segpos + offset].iter().all(|x| &x.name != sym) {
                             cslist[segpos + offset].push(Pubsymref {
                                 name: sym.clone(),
+                                valid: is_active,
                                 refs: refvec.clone(),
                             });
                         }
@@ -634,26 +642,45 @@ mod tests {
     #[test]
     fn unify_refs_1() {
         let mut ref_hashmap = HashMap::new();
-        ref_hashmap.insert(0, vec![String::from("a"), String::from("b")]);
+        ref_hashmap.insert(
+            0,
+            vec![
+                (String::from("a"), RefKind::Invalid),
+                (String::from("b"), RefKind::Valid),
+            ],
+        );
         assert_eq!(
             unify_refs(&mut vec![][..], &mut ref_hashmap, 0),
-            vec![("a", SymGoodness::RefOnly), ("b", SymGoodness::RefOnly)]
+            vec![("b", SymGoodness::RefOnly)]
         );
     }
     #[test]
     fn unify_refs_2() {
         let mut ref_hashmap = HashMap::new();
-        ref_hashmap.insert(0, vec![String::from("ba"), String::from("c")]);
+        ref_hashmap.insert(
+            0,
+            vec![
+                (String::from("ba"), RefKind::Valid),
+                (String::from("c"), RefKind::Valid),
+            ],
+        );
         assert_eq!(
             unify_refs(
                 &mut vec![vec![
                     Pubsymref {
                         name: String::from("c"),
+                        valid: true,
                         refs: vec![(4, String::from("k"))]
                     },
                     Pubsymref {
                         name: String::from("ab"),
+                        valid: true,
                         refs: vec![(7, String::from("l"))]
+                    },
+                    Pubsymref {
+                        name: String::from("d"),
+                        valid: false,
+                        refs: vec![(0, String::from("c"))]
                     }
                 ]][..],
                 &mut ref_hashmap,
@@ -670,21 +697,28 @@ mod tests {
         let mut ref_hashmap = HashMap::new();
         ref_hashmap.insert(
             0,
-            vec![String::from("ba"), String::from("c"), String::from("ab")],
+            vec![
+                (String::from("ba"), RefKind::Valid),
+                (String::from("c"), RefKind::Valid),
+                (String::from("ab"), RefKind::Invalid),
+            ],
         );
         assert_eq!(
             unify_refs(
                 &mut vec![vec![
                     Pubsymref {
                         name: String::from("c"),
+                        valid: true,
                         refs: vec![(4, String::from("k"))]
                     },
                     Pubsymref {
                         name: String::from("ab"),
+                        valid: true,
                         refs: vec![(3, String::from("k")), (7, String::from("l"))]
                     },
                     Pubsymref {
                         name: String::from("ab"),
+                        valid: true,
                         refs: vec![(0, String::from("ab"))]
                     }
                 ]][..],
