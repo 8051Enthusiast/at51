@@ -47,6 +47,9 @@ struct Libfind {
     /// OMF51 Libraries to take definitions from
     #[arg(index = 2)]
     libraries: Vec<String>,
+    /// Minimum length of function to match, excluding fixed up addresses (in bytes)
+    #[arg(short, long, default_value_t = 4)]
+    min_fn_length: usize,
 }
 
 #[derive(Parser, Debug)]
@@ -200,6 +203,7 @@ fn main() {
             no_check,
             file,
             mut libraries,
+            min_fn_length,
         }) => {
             let contents = read_whole_file_by_name(&file);
             let check = !no_check;
@@ -211,10 +215,11 @@ fn main() {
                 process::exit(2);
             }
             let (mut pubnames, mut refnames) =
-                libfind::read_libraries(&libraries, &contents, check).unwrap_or_else(|err| {
-                    eprintln!("Could not process library files: {}", err);
-                    process::exit(2);
-                });
+                libfind::read_libraries(&libraries, &contents, check, min_fn_length)
+                    .unwrap_or_else(|err| {
+                        eprintln!("Could not process library files: {}", err);
+                        process::exit(2);
+                    });
             let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
             if json {
                 let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {

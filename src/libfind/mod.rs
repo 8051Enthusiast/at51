@@ -29,10 +29,12 @@ pub type RefHashMap<S> = HashMap<usize, Vec<String>, S>;
 /// * `libpath`: Array of libraray paths
 /// * `contents`: Contents of the file to find segments of
 /// * `check`: Whether to check if local references are valid
+/// * `min_fn_length`: Minimum length of matched functions
 pub fn read_libraries(
     libpath: &[String],
     contents: &[u8],
     check: bool,
+    min_fn_length: usize,
 ) -> Result<(Vec<Vec<Pubsymref>>, RefHashMap<RandomState>)> {
     let mut libnames: Vec<std::path::PathBuf> = Vec::new();
     for path in libpath {
@@ -68,7 +70,7 @@ pub fn read_libraries(
         let modseg: SegmentCollection = parsed
             .unwrap()
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
-        modseg.find_segments(contents, &mut pubnames, &mut refnames, check);
+        modseg.find_segments(contents, &mut pubnames, &mut refnames, check, min_fn_length);
     }
     Ok((pubnames, refnames))
 }
@@ -356,12 +358,14 @@ impl SegmentCollection {
     /// 0x10000
     /// * `checkref`: whether to check if local direct segment refernces are checked for validity
     /// (reduces noise)
+    /// * `min_fn_length`: minimum length of a matched function
     pub fn find_segments<S: BuildHasher>(
         self,
         buf: &[u8],
         cslist: &mut [Vec<Pubsymref>],
         rslist: &mut RefHashMap<S>,
         checkref: bool,
+        min_fn_length: usize,
     ) {
         let mut seglist: Vec<Vec<usize>> = Vec::new();
         // first find all segments in the buffer
@@ -380,21 +384,21 @@ impl SegmentCollection {
             };
             seglist.push(locs);
         }
-        for (segindex, x) in seglist.iter().enumerate() {
+        for (segment, x) in self.segments.iter().zip(seglist.iter()) {
             for segpos in x {
                 // short segments can create a lot of noise and we don't really care for them
                 // anyway
-                let active_bytes: usize = self.segments[segindex]
+                let active_bytes: usize = segment
                     .content_mask
                     .iter()
                     .map(|(_, mask)| usize::from(*mask != 0))
                     .sum();
-                if active_bytes < 4 {
+                if active_bytes < min_fn_length {
                     continue;
                 }
                 let mut invalid = false;
                 let mut refvec: Vec<(usize, String)> = Vec::new();
-                for fix in &self.segments[segindex].fixup {
+                for fix in &segment.fixup {
                     invalid |= !match (&fix.code_ref.reftype, fix.find_target(buf, *segpos)) {
                         // for direct references, check if the other segment exists
                         (RefType::SegId(id), Some(target)) => seglist[*id].contains(&target),
@@ -413,7 +417,7 @@ impl SegmentCollection {
                 }
                 invalid &= checkref;
                 if !invalid {
-                    for (sym, offset) in &self.segments[segindex].pubsyms {
+                    for (sym, offset) in &segment.pubsyms {
                         if cslist[segpos + offset].iter().all(|x| &x.name != sym) {
                             cslist[segpos + offset].push(Pubsymref {
                                 name: sym.clone(),
