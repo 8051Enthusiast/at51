@@ -50,6 +50,9 @@ struct Libfind {
     /// Minimum length of function to match, excluding fixed up addresses (in bytes)
     #[arg(short, long, default_value_t = 4)]
     min_fn_length: usize,
+    /// Skip addresses where more than n functions are found
+    #[arg(short, long)]
+    skip_multiple: Option<usize>,
 }
 
 #[derive(Parser, Debug)]
@@ -204,6 +207,7 @@ fn main() {
             file,
             mut libraries,
             min_fn_length,
+            skip_multiple,
         }) => {
             let contents = read_whole_file_by_name(&file);
             let check = !no_check;
@@ -220,7 +224,7 @@ fn main() {
                         eprintln!("Could not process library files: {}", err);
                         process::exit(2);
                     });
-            let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames);
+            let segrefs = libfind::process_segrefs(&mut pubnames, &mut refnames, skip_multiple);
             if json {
                 let json_str = serde_json::to_string(&segrefs).unwrap_or_else(|err| {
                     eprintln!("Could not print json: {}", err);

@@ -90,11 +90,21 @@ pub struct Segref {
 /// * `cslist`: List of public symbols of segments found in the file at each address and the
 /// symbols it references
 /// * `rslist`: HashMap of public symbols referenced by segments by address
-pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut RefHashMap) -> Vec<Segref> {
+/// * `skip_multiple`: whether to skip addresses with multiple recognized symbols
+pub fn process_segrefs(
+    cslist: &mut [Vec<Pubsymref>],
+    rslist: &mut RefHashMap,
+    skip_amount: Option<usize>,
+) -> Vec<Segref> {
     // first get all symbols which lay in the file
     let mut segrefs: Vec<Segref> = Vec::new();
     for i in 0..cslist.len() {
         let matches = unify_refs(cslist, rslist, i);
+        if let Some(amount) = skip_amount {
+            if matches.len() > amount {
+                continue;
+            }
+        }
         for (s, r) in matches {
             segrefs.push(Segref {
                 location: i,
@@ -108,6 +118,11 @@ pub fn process_segrefs(cslist: &mut [Vec<Pubsymref>], rslist: &mut RefHashMap) -
     let mut leftover_refs: Vec<_> = rslist.iter().filter(|(i, _)| **i >= cslist.len()).collect();
     leftover_refs.sort_by_key(|(i, _)| **i);
     for (i, arr) in leftover_refs.into_iter() {
+        if let Some(amount) = skip_amount {
+            if arr.len() > amount {
+                continue;
+            }
+        }
         for s in arr.iter().filter(|s| s.1 == RefKind::Valid) {
             segrefs.push(Segref {
                 location: *i,
