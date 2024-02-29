@@ -58,7 +58,7 @@ checksum = "d67af77d68a931ecd5cbd8a3b5987d63a1d1d1278f7f6a60ae33db485cdebb69"
 
 [[package]]
 name = "at51"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "ar",
  "bitflags 2.4.2",
