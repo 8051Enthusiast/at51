@@ -1,3 +1,15 @@
+1.1.1 (2024-07-29)
+==================
+* Make Cargo.lock be in sync with Cargo.toml (oops)
+
+1.1.0 (2024-02-29)
+==================
+* Added `--min-fn-length` and `--skip-multiple` options to libfind to allow specifying a minimum function length
+  required to match, and skipping addresses where too many functions are recognized, respectively
+* Fix bug where short functions would generate indirect functions below the `--min-fn-length`
+  threshold (which was previously hardcoded to be 4)
+* Updated dependencies (and use `cargo dist` for generating executables for this release)
+
 1.0.0 (2021-08-17)
 ==================
 * Arbitrarily decide that this version is 1.0.0 because it has been stable enough

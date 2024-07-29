@@ -2,9 +2,9 @@
 name = "at51"
 description = "Some applications for reverse engineering 8051 firmware"
 readme = "README.md"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["8051Enthusiast"]
-edition = "2018"
+edition = "2021"
 keywords = ["reverse-engineering", "8051"]
 categories = ["command-line-utilities"]
 license = "MIT"
@@ -16,9 +16,9 @@ clap = { version = "4.5", features = ["derive"] }# cl arg parsing
 rustfft = "6.2"       # base address finding
 nom = "7.1"           # parse libraries, init structure
 num-traits = "^0.2"	  # omf51 parsing
-lazy_static = "1.4.0" # for some default values
+lazy_static = "1.5.0" # for some default values
 ar = "0.9"            # for sdcc library, which is an bsd ar archive
-bitflags = "2.4"	  # for sdcc library
+bitflags = "2.6"	  # for sdcc library
 serde_json = "1.0"    # json output
 serde = { version = "1.0", features = ["derive"] }
 dirs = "5.0"
@@ -34,9 +34,9 @@ lto = "thin"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.11.1"
+cargo-dist-version = "0.19.1"
 # CI backends to support
-ci = ["github"]
+ci = "github"
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
