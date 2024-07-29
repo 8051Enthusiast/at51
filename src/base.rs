@@ -103,7 +103,7 @@ pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
 
 // finds `num` maximal indexes
 pub fn maxidx(arr: &[f64], num: usize) -> Vec<(usize, f64)> {
-    let mut maxidx = vec![(0, std::f64::NEG_INFINITY); num + 1];
+    let mut maxidx = vec![(0, f64::NEG_INFINITY); num + 1];
     for candidate in arr.iter().enumerate().map(|(a, b)| (a, *b)) {
         if maxidx.len() > num {
             maxidx[num] = candidate;
