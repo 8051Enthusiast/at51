@@ -29,7 +29,7 @@ use rustfft::FftPlanner;
 ///
 /// * `buf` - Contents of the firmware file
 /// * `acall` - whether to include acall/ajmp in the calculation (this
-/// can introduce a lot of noise)
+///   can introduce a lot of noise)
 ///
 pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
     assert!(buf.len() <= 0x10000);
@@ -52,23 +52,23 @@ pub fn find_base(buf: &[u8], acall: bool, cyclic: bool) -> Vec<f64> {
             InsType::Ljmp | InsType::Lcall => {
                 // mark the target addresses in the target address array
                 let target = ins.get_jump_target().unwrap();
-                ljmps[target] += 1;
+                ljmps[target] = 1;
             }
             InsType::Ajmp | InsType::Acall => {
                 if acall {
                     // find the target address of the ajmp/acall instruction
                     let target = ins.get_jump_target().unwrap();
-                    ajmps[target] += 1;
+                    ajmps[target] = 1;
                     // for different base addresses, the relative target address of two different ajmps can
                     // vary by 2048, so we just note both possibilities in the array
                     let second_target = (target + 2048) & 0xffff | target & !0xffff;
-                    ajmps[second_target] += 1;
+                    ajmps[second_target] = 1;
                 }
             }
             InsType::Ret | InsType::Reti => {
                 // mark the address after the ret instruction
                 let ret_loc = (ins.pos + 1) & 0xffff | ins.pos & !0xffff;
-                rets[ret_loc] += 1;
+                rets[ret_loc] = 1;
             }
             _ => {}
         }

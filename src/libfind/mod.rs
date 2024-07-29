@@ -88,7 +88,7 @@ pub struct Segref {
 ///
 /// # Arguments
 /// * `cslist`: List of public symbols of segments found in the file at each address and the
-/// symbols it references
+///   symbols it references
 /// * `rslist`: HashMap of public symbols referenced by segments by address
 /// * `skip_multiple`: whether to skip addresses with multiple recognized symbols
 pub fn process_segrefs(
@@ -374,9 +374,9 @@ impl SegmentCollection {
     /// * `buf`: buffer to find segments in
     /// * `cslist`: vector to add public symbols name of found segments, cslist.len() == buf.len()
     /// * `rslist`: vector to add public symbol references from found segments, rslist.len() ==
-    /// 0x10000
+    ///   0x10000
     /// * `checkref`: whether to check if local direct segment refernces are checked for validity
-    /// (reduces noise)
+    ///   (reduces noise)
     /// * `min_fn_length`: minimum length of a matched function
     pub fn find_segments(
         self,
@@ -512,7 +512,7 @@ impl Segment {
     /// # Arguments
     /// * `addr`: Absolute address of the segment
     /// * `content_mask`: (value,mask) pairs of the segment, where fixed-up or undefined locations
-    /// are masked
+    ///    are masked
     /// * `fixup`: Vector of Fixups that lead to other code locations
     /// * `pubsyms`: Strings and offset of public symbols within segment
     pub fn new_absolute(
@@ -531,7 +531,7 @@ impl Segment {
     /// New relocatable Segment.
     /// # Arguments
     /// * `content_mask`: (value,mask) pairs of the segment, where fixed-up or undefined locations
-    /// are masked
+    ///    are masked
     /// * `fixup`: Vector of Fixups that lead to other code locations
     /// * `pubsyms`: Strings and offset of public symbols within segment
     pub fn new_relocatable(
@@ -566,7 +566,7 @@ impl Fixup {
     /// * `refloc`: location of fixup relative to segment begin
     /// * `size`: size of the region that is fixed up
     /// * `addr_fun`: a function that, given the bytes and absolute address of the fixup location,
-    /// returns the location pointed to
+    ///   returns the location pointed to
     /// * `code_ref`: Type of reference (segment or public symbol)
     pub fn new(
         refloc: usize,

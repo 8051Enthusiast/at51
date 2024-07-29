@@ -155,7 +155,7 @@ impl FreqInfo {
     /// Derives frequency information from a buffer with given bucket sizes
     /// # Arguments
     /// * `buckets`: sizes of the buckets where opcodes of similar frequencies get put, in
-    /// ascending order of frequency
+    ///   ascending order of frequency
     /// * `buf`: corpus containing pure 8051 machine code
     pub fn new(buckets: &[usize], buf: &[u8]) -> Result<FreqInfo, &'static str> {
         let bucketsum: usize = buckets.iter().sum();
